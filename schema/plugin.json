@@ -1,0 +1,8 @@
+{
+  "jupyter.lab.shortcuts": [],
+  "title": "jupyter-mynerva",
+  "description": "jupyter-mynerva settings.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

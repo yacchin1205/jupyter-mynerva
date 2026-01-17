@@ -1,5 +1,8 @@
 # jupyter-mynerva
 
+[![Github Actions Status](https://github.com/yacchin1205/jupyter-mynerva/workflows/Build/badge.svg)](https://github.com/yacchin1205/jupyter-mynerva/actions/workflows/build.yml)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/yacchin1205/jupyter-mynerva/main?urlpath=lab)
+
 A JupyterLab extension that provides an LLM-powered assistant with deep understanding of notebook structure.
 
 ## Why "Mynerva"?
@@ -184,24 +187,50 @@ Fernet key for encrypting API keys in JupyterLab Settings. If absent, warning lo
 | JupyterLab Settings | User brings own key |
 | `c.Mynerva.openai_api_key` | Default key for dev/shared environments |
 
-## Getting Started
+## Requirements
 
-### Try on Binder
+- JupyterLab >= 4.0.0
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/yacchin1205/jupyter-mynerva/main)
-
-### Install
+## Install
 
 ```bash
-pip install jupyter-mynerva
+pip install jupyter_mynerva
 ```
 
-### Local Development
+## Contributing
+
+### Development install
 
 ```bash
-docker build -t jupyter-mynerva .
-docker run -p 8888:8888 -e MYNERVA_SECRET_KEY=your-fernet-key jupyter-mynerva
+# Clone the repo to your local environment
+# Change directory to the jupyter_mynerva directory
+
+# Set up a virtual environment and install package in development mode
+python -m venv .venv
+source .venv/bin/activate
+pip install --editable "."
+
+# Link your development version of the extension with JupyterLab
+jupyter labextension develop . --overwrite
+# Server extension must be manually installed in develop mode
+jupyter server extension enable jupyter_mynerva
+
+# Rebuild extension Typescript source after making changes
+jlpm build
 ```
+
+You can watch the source directory and run JupyterLab at the same time in different terminals to watch for changes in the extension's source and automatically rebuild the extension.
+
+```bash
+# Watch the source directory in one terminal, automatically rebuilding when needed
+jlpm watch
+# Run JupyterLab in another terminal
+jupyter lab
+```
+
+### Packaging the extension
+
+See [RELEASE](RELEASE.md)
 
 ## References
 

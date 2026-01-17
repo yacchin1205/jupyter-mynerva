@@ -1,0 +1,16 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v4.5.1
+_src_path: https://github.com/jupyterlab/extension-template
+author_email: ''
+author_name: yacchin1205
+has_ai_rules: false
+has_binder: true
+has_settings: true
+kind: frontend-and-server
+labextension_name: jupyter-mynerva
+project_short_description: A JupyterLab extension that provides an LLM-powered assistant
+    with deep understanding of notebook structure.
+python_name: jupyter_mynerva
+repository: https://github.com/yacchin1205/jupyter-mynerva
+test: false
+
