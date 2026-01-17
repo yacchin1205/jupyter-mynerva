@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { IQueryAction, ActionStatus } from './types';
+import { DropdownButton } from './DropdownButton';
 
 interface IQueryActionCardProps {
   action: IQueryAction;
   status: ActionStatus;
   onShare: () => void;
+  onShareAlways: () => void;
   onDismiss: () => void;
 }
 
@@ -27,6 +29,7 @@ export function QueryActionCard({
   action,
   status,
   onShare,
+  onShareAlways,
   onDismiss
 }: IQueryActionCardProps): React.ReactElement {
   const label = getActionLabel(action);
@@ -40,12 +43,12 @@ export function QueryActionCard({
       <div className="jp-Mynerva-action-label">{label}</div>
       {status === 'pending' && (
         <div className="jp-Mynerva-action-buttons">
-          <button
-            className="jp-Mynerva-action-button jp-Mynerva-share-button"
-            onClick={onShare}
-          >
-            Share
-          </button>
+          <DropdownButton
+            options={[
+              { label: 'Share', onClick: onShare },
+              { label: 'Share & Always', onClick: onShareAlways }
+            ]}
+          />
           <button
             className="jp-Mynerva-action-button jp-Mynerva-dismiss-button"
             onClick={onDismiss}

@@ -16,7 +16,8 @@ import {
   parseRawContent,
   validateActions,
   QueryActionCard,
-  MutateActionCard
+  MutateActionCard,
+  DropdownButton
 } from './actions';
 import { buildSystemPrompt } from './systemPrompt';
 import { IFilter, applyFilters } from './filter';
@@ -282,12 +283,44 @@ const MUTATE_ACTION_TYPES = [
   'runCell'
 ];
 
+// Query hierarchy: higher level permits lower levels
+// getOutput > getCells > getSection > getToc
+const QUERY_HIERARCHY: Record<string, string[]> = {
+  getOutput: ['getCells', 'getSection', 'getToc'],
+  getCells: ['getSection', 'getToc'],
+  getSection: ['getToc'],
+  getToc: []
+};
+
 function isQueryAction(action: IAction): action is IQueryAction {
   return QUERY_ACTION_TYPES.includes(action.type);
 }
 
 function isMutateAction(action: IAction): action is IMutateAction {
   return MUTATE_ACTION_TYPES.includes(action.type);
+}
+
+type QueryActionType = 'getToc' | 'getSection' | 'getCells' | 'getOutput';
+type MutateActionType = 'insertCell' | 'updateCell' | 'deleteCell' | 'runCell';
+type ActionType = QueryActionType | MutateActionType;
+
+function isQueryAutoApproved(
+  approvedTypes: Set<ActionType>,
+  actionType: QueryActionType
+): boolean {
+  if (approvedTypes.has(actionType)) {
+    return true;
+  }
+  // Check hierarchy: if a higher-level action is approved, this one is too
+  for (const [approved, permitted] of Object.entries(QUERY_HIERARCHY)) {
+    if (
+      approvedTypes.has(approved as ActionType) &&
+      permitted.includes(actionType)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 interface IChatViewProps {
@@ -298,14 +331,25 @@ interface IChatViewProps {
     actionIndex: number,
     action: IAction
   ) => void;
+  onActionShareAlways: (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => void;
   onActionDismiss: (msgIndex: number, actionIndex: number) => void;
   onActionApply: (
     msgIndex: number,
     actionIndex: number,
     action: IAction
   ) => void;
+  onActionApplyAlways: (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => void;
   onActionCancel: (msgIndex: number, actionIndex: number) => void;
   onAcceptAll: (msgIndex: number) => void;
+  onAcceptAllAlways: (msgIndex: number) => void;
   onRejectAll: (msgIndex: number) => void;
   getActionStatus: (msgIndex: number, actionIndex: number) => ActionStatus;
   loading: boolean;
@@ -327,10 +371,13 @@ function ChatView({
   messages,
   onSendMessage,
   onActionShare,
+  onActionShareAlways,
   onActionDismiss,
   onActionApply,
+  onActionApplyAlways,
   onActionCancel,
   onAcceptAll,
+  onAcceptAllAlways,
   onRejectAll,
   getActionStatus,
   loading,
@@ -340,6 +387,18 @@ function ChatView({
 }: IChatViewProps): React.ReactElement {
   const [input, setInput] = React.useState('');
   const inputDisabled = loading || hasPendingActions;
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  React.useEffect(() => {
+    if (!loading && !hasPendingActions) {
+      inputRef.current?.focus();
+    }
+  }, [loading, hasPendingActions]);
 
   const handleSend = () => {
     if (!input.trim() || inputDisabled) {
@@ -390,12 +449,19 @@ function ChatView({
                         {pendingCount} action{pendingCount > 1 ? 's' : ''}
                       </span>
                       <div className="jp-Mynerva-actions-bulk">
-                        <button
-                          className="jp-Mynerva-bulk-button jp-Mynerva-accept-all"
-                          onClick={() => onAcceptAll(msgIndex)}
-                        >
-                          Accept All
-                        </button>
+                        <DropdownButton
+                          className="jp-Mynerva-accept-all"
+                          options={[
+                            {
+                              label: 'Accept All',
+                              onClick: () => onAcceptAll(msgIndex)
+                            },
+                            {
+                              label: 'Accept All & Always',
+                              onClick: () => onAcceptAllAlways(msgIndex)
+                            }
+                          ]}
+                        />
                         <button
                           className="jp-Mynerva-bulk-button jp-Mynerva-reject-all"
                           onClick={() => onRejectAll(msgIndex)}
@@ -417,6 +483,9 @@ function ChatView({
                             onApply={() =>
                               onActionApply(msgIndex, actionIndex, action)
                             }
+                            onApplyAlways={() =>
+                              onActionApplyAlways(msgIndex, actionIndex, action)
+                            }
                             onCancel={() =>
                               onActionCancel(msgIndex, actionIndex)
                             }
@@ -437,6 +506,9 @@ function ChatView({
                             onShare={() =>
                               onActionShare(msgIndex, actionIndex, action)
                             }
+                            onShareAlways={() =>
+                              onActionShareAlways(msgIndex, actionIndex, action)
+                            }
                             onDismiss={() =>
                               onActionDismiss(msgIndex, actionIndex)
                             }
@@ -455,9 +527,11 @@ function ChatView({
             <div className="jp-Mynerva-message-content">...</div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
       <div className="jp-Mynerva-input-area">
         <textarea
+          ref={inputRef}
           className="jp-Mynerva-input"
           value={input}
           onChange={e => setInput(e.target.value)}
@@ -510,6 +584,10 @@ function MynervaComponent({
   const [initError, setInitError] = React.useState<string | null>(null);
   const [filters, setFilters] = React.useState<IFilter[]>([]);
   const [filterEnabled, setFilterEnabled] = React.useState(true);
+  // Auto-approval: Map<notebookPath, Set<actionType>>
+  const [autoApproved, setAutoApproved] = React.useState<
+    Map<string, Set<ActionType>>
+  >(new Map());
 
   React.useEffect(() => {
     Promise.all([getProviders(), getConfig()])
@@ -548,26 +626,35 @@ function MynervaComponent({
 
   const executeQueryAction = (action: IAction): string => {
     let result: string;
+    const path = contextEngine.getNotebookPath();
     switch (action.type) {
       case 'getToc': {
         const toc = contextEngine.getToc();
-        result = JSON.stringify({ type: 'getToc', result: toc }, null, 2);
+        result = JSON.stringify({ type: 'getToc', path, result: toc }, null, 2);
         break;
       }
       case 'getSection': {
         const cells = contextEngine.getSection(action.query);
-        result = JSON.stringify({ type: 'getSection', result: cells }, null, 2);
+        result = JSON.stringify(
+          { type: 'getSection', path, result: cells },
+          null,
+          2
+        );
         break;
       }
       case 'getCells': {
         const cells = contextEngine.queryCells(action.query, action.count);
-        result = JSON.stringify({ type: 'getCells', result: cells }, null, 2);
+        result = JSON.stringify(
+          { type: 'getCells', path, result: cells },
+          null,
+          2
+        );
         break;
       }
       case 'getOutput': {
         const outputs = contextEngine.getOutput(action.query);
         result = JSON.stringify(
-          { type: 'getOutput', result: outputs },
+          { type: 'getOutput', path, result: outputs },
           null,
           2
         );
@@ -719,6 +806,47 @@ function MynervaComponent({
     setActionStatus(msgIndex, actionIndex, 'cancelled');
   };
 
+  const addAutoApproval = (actionType: ActionType) => {
+    const path = contextEngine.getNotebookPath();
+    setAutoApproved(prev => {
+      const newMap = new Map(prev);
+      const types = newMap.get(path) ?? new Set<ActionType>();
+      types.add(actionType);
+      newMap.set(path, types);
+      return newMap;
+    });
+  };
+
+  const isActionAutoApproved = (action: IAction): boolean => {
+    const path = contextEngine.getNotebookPath();
+    const approved = autoApproved.get(path);
+    if (!approved) {
+      return false;
+    }
+    if (isQueryAction(action)) {
+      return isQueryAutoApproved(approved, action.type as QueryActionType);
+    }
+    return approved.has(action.type as ActionType);
+  };
+
+  const handleActionShareAlways = (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => {
+    addAutoApproval(action.type as ActionType);
+    handleActionShare(msgIndex, actionIndex, action);
+  };
+
+  const handleActionApplyAlways = async (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => {
+    addAutoApproval(action.type as ActionType);
+    await handleActionApply(msgIndex, actionIndex, action);
+  };
+
   const handleAcceptAll = async (msgIndex: number) => {
     const msg = messages[msgIndex];
     const actions = msg.actions || [];
@@ -749,6 +877,24 @@ function MynervaComponent({
         handleActionDismiss(msgIndex, i);
       } else if (isMutateAction(action)) {
         handleActionCancel(msgIndex, i);
+      }
+    }
+  };
+
+  const handleAcceptAllAlways = async (msgIndex: number) => {
+    const msg = messages[msgIndex];
+    const actions = msg.actions || [];
+
+    for (let i = 0; i < actions.length; i++) {
+      if (getActionStatus(msgIndex, i) !== 'pending') {
+        continue;
+      }
+      const action = actions[i];
+      addAutoApproval(action.type as ActionType);
+      if (isQueryAction(action)) {
+        handleActionShare(msgIndex, i, action);
+      } else if (isMutateAction(action)) {
+        await handleActionApply(msgIndex, i, action);
       }
     }
   };
@@ -798,6 +944,37 @@ function MynervaComponent({
 
     sendResults();
   }, [hasPendingActions, pendingResults, loading]);
+
+  // Auto-execute approved actions when new messages arrive
+  React.useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    const executeAutoApproved = async () => {
+      for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
+        const msg = messages[msgIndex];
+        const actions = msg.actions || [];
+
+        for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {
+          const action = actions[actionIndex];
+          const status = getActionStatus(msgIndex, actionIndex);
+
+          if (status !== 'pending' || !isActionAutoApproved(action)) {
+            continue;
+          }
+
+          if (isQueryAction(action)) {
+            handleActionShare(msgIndex, actionIndex, action);
+          } else if (isMutateAction(action)) {
+            await handleActionApply(msgIndex, actionIndex, action);
+          }
+        }
+      }
+    };
+
+    executeAutoApproved();
+  }, [messages, autoApproved]);
 
   const processLLMResponse = async (
     rawContent: string,
@@ -941,10 +1118,13 @@ function MynervaComponent({
           messages={messages}
           onSendMessage={handleSendMessage}
           onActionShare={handleActionShare}
+          onActionShareAlways={handleActionShareAlways}
           onActionDismiss={handleActionDismiss}
           onActionApply={handleActionApply}
+          onActionApplyAlways={handleActionApplyAlways}
           onActionCancel={handleActionCancel}
           onAcceptAll={handleAcceptAll}
+          onAcceptAllAlways={handleAcceptAllAlways}
           onRejectAll={handleRejectAll}
           getActionStatus={getActionStatus}
           loading={loading}

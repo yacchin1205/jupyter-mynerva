@@ -11,7 +11,7 @@ export function buildSystemPrompt(): string {
 
 Available actions:
 
-Query (active notebook):
+Query (active notebook) - results include "path" (notebook file path):
   - getToc: {} - Get heading structure of current notebook
   - getSection: { "query": {...} } - Get cells under matched heading
   - getCells: { "query": {...}, "count": N } - Get cell range from matched position

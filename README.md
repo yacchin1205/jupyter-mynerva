@@ -60,7 +60,7 @@ The LLM actively explores—requesting the table of contents, navigating section
 | Session lifecycle   | Independent of active notebook; explicit switch only                                               |
 | Streaming           | Not supported                                                                                      |
 | File access         | Jupyter root directory only                                                                        |
-| Action confirmation | Batch confirmation supported; trust mode available                                                 |
+| Action confirmation | Batch confirmation supported; per-notebook auto-approval available                                 |
 | Mutation validation | Optimistic locking via `_hash`; must read before write                                             |
 | Error handling      | API failure: retry with limit (3). Hash mismatch / user rejection: feedback to LLM, no retry count |
 | LLM providers       | OpenAI, Anthropic                                                                                  |
@@ -130,6 +130,30 @@ Query actions show a preview before sending to LLM. Users can choose to apply pr
 | ---------- | ---------- | ------------------------------------------------- |
 | `listHelp` | —          | Show available actions (re-display system prompt) |
 | `help`     | `action`   | Show details for specific action                  |
+
+### Action Auto-Approval
+
+Users can choose "Always allow for this notebook" when approving an action. Auto-approval is scoped to:
+
+- **Same notebook** (the currently open tab)
+- **Same action type** (or broader for Query actions)
+
+**Query action hierarchy:**
+
+Query actions have a granularity hierarchy. Approving finer-grained actions automatically approves coarser-grained ones:
+
+| Approved Action | Also Approved                      |
+| --------------- | ---------------------------------- |
+| `getOutput`     | `getCells`, `getSection`, `getToc` |
+| `getCells`      | `getSection`, `getToc`             |
+| `getSection`    | `getToc`                           |
+| `getToc`        | (none)                             |
+
+Rationale: If the user trusts output-level access, code and structure access (which may expose less sensitive detail) is implicitly trusted.
+
+**Mutate actions**: Each type (`insertCell`, `updateCell`, `deleteCell`, `runCell`) requires separate approval. No hierarchy applies.
+
+Auto-approval is cleared when switching notebooks or closing the panel.
 
 ## System Prompt
 

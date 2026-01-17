@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { IMutateAction, ActionStatus } from './types';
+import { DropdownButton } from './DropdownButton';
 
 interface IMutateActionCardProps {
   action: IMutateAction;
   status: ActionStatus;
   onApply: () => void;
+  onApplyAlways: () => void;
   onCancel: () => void;
 }
 
@@ -37,6 +39,7 @@ export function MutateActionCard({
   action,
   status,
   onApply,
+  onApplyAlways,
   onCancel
 }: IMutateActionCardProps): React.ReactElement {
   const [showPreview, setShowPreview] = React.useState(false);
@@ -64,12 +67,12 @@ export function MutateActionCard({
             <pre className="jp-Mynerva-action-preview">{previewContent}</pre>
           )}
           <div className="jp-Mynerva-action-buttons">
-            <button
-              className="jp-Mynerva-action-button jp-Mynerva-apply-button"
-              onClick={onApply}
-            >
-              Apply
-            </button>
+            <DropdownButton
+              options={[
+                { label: 'Apply', onClick: onApply },
+                { label: 'Apply & Always', onClick: onApplyAlways }
+              ]}
+            />
             <button
               className="jp-Mynerva-action-button jp-Mynerva-cancel-button"
               onClick={onCancel}

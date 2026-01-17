@@ -378,3 +378,87 @@
   word-break: break-all;
   max-height: 200px;
 }
+
+/* Dropdown button */
+.jp-Mynerva-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.jp-Mynerva-dropdown-buttons {
+  display: flex;
+}
+
+.jp-Mynerva-action-button.jp-Mynerva-dropdown-main {
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.jp-Mynerva-action-button.jp-Mynerva-dropdown-toggle {
+  border-left: 1px solid rgb(255 255 255 / 30%);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.jp-Mynerva-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  min-width: 100%;
+  margin-top: 2px;
+  background: var(--jp-layout-color2);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+
+.jp-Mynerva-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--jp-ui-font-color1);
+  font-size: var(--jp-ui-font-size0);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.jp-Mynerva-dropdown-item:hover {
+  background: var(--jp-layout-color3);
+}
+
+/* Bulk dropdown styling */
+.jp-Mynerva-actions-bulk .jp-Mynerva-dropdown-main,
+.jp-Mynerva-actions-bulk .jp-Mynerva-dropdown-toggle {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: var(--jp-ui-font-size0);
+  font-weight: 500;
+}
+
+.jp-Mynerva-actions-bulk .jp-Mynerva-dropdown-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.jp-Mynerva-actions-bulk .jp-Mynerva-dropdown-toggle {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 4px 8px;
+}
+
+.jp-Mynerva-actions-bulk .jp-Mynerva-accept-all {
+  background: #2e7d32;
+  color: white;
+}
+
+.jp-Mynerva-actions-bulk .jp-Mynerva-accept-all:hover {
+  background: #1b5e20;
+}
