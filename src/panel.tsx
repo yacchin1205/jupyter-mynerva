@@ -18,6 +18,12 @@ interface IConfig {
   provider: string;
   model: string;
   apiKey: string;
+  useDefault?: boolean;
+}
+
+interface IDefaultConfig {
+  provider: string;
+  model: string;
 }
 
 interface IProvider {
@@ -29,6 +35,7 @@ interface IProvider {
 interface IProvidersResponse {
   providers: IProvider[];
   encryption: boolean;
+  defaults: IDefaultConfig | null;
 }
 
 async function getProviders(): Promise<IProvidersResponse> {
@@ -118,6 +125,8 @@ interface ISettingsViewProps {
   config: IConfig;
   providers: IProvider[];
   encryption: boolean;
+  defaults: IDefaultConfig | null;
+  defaultsUnavailable: boolean;
   onSave: (config: IConfig) => void;
 }
 
@@ -125,8 +134,13 @@ function SettingsView({
   config,
   providers,
   encryption,
+  defaults,
+  defaultsUnavailable,
   onSave
 }: ISettingsViewProps): React.ReactElement {
+  const [useDefault, setUseDefault] = React.useState(
+    defaultsUnavailable ? false : (config.useDefault ?? false)
+  );
   const [provider, setProvider] = React.useState(config.provider);
   const [model, setModel] = React.useState(config.model);
   const [apiKey, setApiKey] = React.useState(config.apiKey);
@@ -148,7 +162,7 @@ function SettingsView({
     setSaving(true);
     setError('');
     try {
-      const newConfig = { provider, model, apiKey };
+      const newConfig = { provider, model, apiKey, useDefault };
       await saveConfig(newConfig);
       onSave(newConfig);
     } catch (e) {
@@ -160,40 +174,61 @@ function SettingsView({
 
   return (
     <div className="jp-Mynerva-settings">
-      {!encryption && (
+      {defaultsUnavailable && (
         <div className="jp-Mynerva-settings-warning">
-          API keys are stored unencrypted. Set MYNERVA_SECRET_KEY for encryption.
+          Default settings are no longer available. Please configure your own API key.
         </div>
       )}
-      <div className="jp-Mynerva-settings-field">
-        <label>Provider</label>
-        <select value={provider} onChange={e => handleProviderChange(e.target.value)}>
-          {providers.map(p => (
-            <option key={p.id} value={p.id}>
-              {p.displayName}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="jp-Mynerva-settings-field">
-        <label>Model</label>
-        <select value={model} onChange={e => setModel(e.target.value)}>
-          {models.map(m => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="jp-Mynerva-settings-field">
-        <label>API Key</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={e => setApiKey(e.target.value)}
-          placeholder="Enter API key"
-        />
-      </div>
+      {defaults && (
+        <div className="jp-Mynerva-settings-field jp-Mynerva-settings-checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={useDefault}
+              onChange={e => setUseDefault(e.target.checked)}
+            />
+            Use default settings ({defaults.provider} / {defaults.model})
+          </label>
+        </div>
+      )}
+      {!useDefault && (
+        <>
+          {!encryption && (
+            <div className="jp-Mynerva-settings-warning">
+              API keys are stored unencrypted. Set MYNERVA_SECRET_KEY for encryption.
+            </div>
+          )}
+          <div className="jp-Mynerva-settings-field">
+            <label>Provider</label>
+            <select value={provider} onChange={e => handleProviderChange(e.target.value)}>
+              {providers.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="jp-Mynerva-settings-field">
+            <label>Model</label>
+            <select value={model} onChange={e => setModel(e.target.value)}>
+              {models.map(m => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="jp-Mynerva-settings-field">
+            <label>API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="Enter API key"
+            />
+          </div>
+        </>
+      )}
       {error && <div className="jp-Mynerva-settings-error">{error}</div>}
       <button
         className="jp-Mynerva-settings-save"
@@ -228,10 +263,17 @@ function ChatView({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+    if (e.key !== 'Enter') {
+      return;
     }
+    // Shift+Enter: newline
+    // isComposing: IME composing (Chrome/Firefox)
+    // keyCode 229: IME input (Safari workaround)
+    if (e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) {
+      return;
+    }
+    e.preventDefault();
+    handleSend();
   };
 
   return (
@@ -273,6 +315,7 @@ function ChatView({
 function MynervaComponent(): React.ReactElement {
   const [providers, setProviders] = React.useState<IProvider[]>([]);
   const [encryption, setEncryption] = React.useState(false);
+  const [defaults, setDefaults] = React.useState<IDefaultConfig | null>(null);
   const [config, setConfig] = React.useState<IConfig | null>(null);
   const [showSettings, setShowSettings] = React.useState(false);
   const [messages, setMessages] = React.useState<IMessage[]>([]);
@@ -284,8 +327,13 @@ function MynervaComponent(): React.ReactElement {
       .then(([providersRes, cfg]) => {
         setProviders(providersRes.providers);
         setEncryption(providersRes.encryption);
+        setDefaults(providersRes.defaults);
         setConfig(cfg);
-        if (!cfg.apiKey) {
+        // Show settings if:
+        // - no API key and not using defaults, OR
+        // - useDefault is set but defaults are not available
+        const defaultsUnavailable = cfg.useDefault && !providersRes.defaults;
+        if ((!cfg.apiKey && !cfg.useDefault) || defaultsUnavailable) {
           setShowSettings(true);
         }
       })
@@ -357,6 +405,8 @@ function MynervaComponent(): React.ReactElement {
           config={config || defaultConfig}
           providers={providers}
           encryption={encryption}
+          defaults={defaults}
+          defaultsUnavailable={!!(config?.useDefault && !defaults)}
           onSave={handleConfigSave}
         />
       ) : (

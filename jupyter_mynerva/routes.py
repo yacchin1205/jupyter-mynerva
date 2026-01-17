@@ -40,6 +40,77 @@ DEFAULT_PROVIDER = 'openai'
 DEFAULT_MODEL = 'gpt-5.2'
 ENCRYPTED_PREFIX = 'encrypted:'
 
+# Load default config from environment variables (and delete secrets)
+_DEFAULT_CONFIG = {}
+
+if 'MYNERVA_OPENAI_API_KEY' in os.environ:
+    _DEFAULT_CONFIG['openai_api_key'] = os.environ['MYNERVA_OPENAI_API_KEY']
+    del os.environ['MYNERVA_OPENAI_API_KEY']
+
+if 'MYNERVA_ANTHROPIC_API_KEY' in os.environ:
+    _DEFAULT_CONFIG['anthropic_api_key'] = os.environ['MYNERVA_ANTHROPIC_API_KEY']
+    del os.environ['MYNERVA_ANTHROPIC_API_KEY']
+
+if 'MYNERVA_DEFAULT_PROVIDER' in os.environ:
+    _DEFAULT_CONFIG['provider'] = os.environ['MYNERVA_DEFAULT_PROVIDER']
+
+if 'MYNERVA_DEFAULT_MODEL' in os.environ:
+    _DEFAULT_CONFIG['model'] = os.environ['MYNERVA_DEFAULT_MODEL']
+
+
+def _get_provider_models(provider_id):
+    """Returns model list for the given provider."""
+    for p in PROVIDERS:
+        if p['id'] == provider_id:
+            return p['models']
+    return []
+
+
+def get_default_config():
+    """Returns default config if available.
+
+    - If only one API key is set, auto-select that provider
+    - If both API keys are set, MYNERVA_DEFAULT_PROVIDER is required
+    - If model is not specified, use first model from provider's list
+    """
+    has_openai = bool(_DEFAULT_CONFIG.get('openai_api_key'))
+    has_anthropic = bool(_DEFAULT_CONFIG.get('anthropic_api_key'))
+
+    if not has_openai and not has_anthropic:
+        return None
+
+    # Determine provider
+    explicit_provider = _DEFAULT_CONFIG.get('provider')
+    if has_openai and has_anthropic:
+        # Both keys present - require explicit provider
+        if not explicit_provider:
+            return None
+        provider = explicit_provider
+    elif has_openai:
+        provider = 'openai'
+    else:
+        provider = 'anthropic'
+
+    # Determine model
+    model = _DEFAULT_CONFIG.get('model')
+    if not model:
+        models = _get_provider_models(provider)
+        model = models[0] if models else ''
+
+    return {
+        'provider': provider,
+        'model': model,
+    }
+
+
+def get_default_api_key(provider):
+    """Returns default API key for the given provider."""
+    if provider == 'openai':
+        return _DEFAULT_CONFIG.get('openai_api_key')
+    elif provider == 'anthropic':
+        return _DEFAULT_CONFIG.get('anthropic_api_key')
+    return None
+
 
 def get_fernet():
     secret_key = os.environ.get('MYNERVA_SECRET_KEY')
@@ -81,6 +152,20 @@ def load_config():
             config = json.load(f)
         config['apiKey'] = decrypt_api_key(config.get('apiKey', ''))
         return config
+
+    # Config doesn't exist - check if defaults are available
+    defaults = get_default_config()
+    if defaults:
+        # Auto-generate config with useDefault=true
+        config = {
+            'provider': defaults['provider'],
+            'model': defaults['model'],
+            'apiKey': '',
+            'useDefault': True
+        }
+        save_config(config)
+        return config
+
     return {'provider': DEFAULT_PROVIDER, 'model': DEFAULT_MODEL, 'apiKey': ''}
 
 
@@ -102,7 +187,8 @@ class ProvidersHandler(APIHandler):
     def get(self):
         self.finish(json.dumps({
             'providers': PROVIDERS,
-            'encryption': is_encryption_configured()
+            'encryption': is_encryption_configured(),
+            'defaults': get_default_config()
         }))
 
 
@@ -142,15 +228,20 @@ class ChatHandler(APIHandler):
         messages = data.get('messages', [])
 
         config = load_config()
-        provider = config.get('provider', DEFAULT_PROVIDER)
-        model = config.get('model', DEFAULT_MODEL)
 
-        api_key = config.get('apiKey')
-        if not api_key:
-            if provider == 'openai':
-                api_key = os.environ.get('OPENAI_API_KEY')
-            elif provider == 'anthropic':
-                api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if config.get('useDefault'):
+            defaults = get_default_config()
+            if not defaults:
+                self.set_status(500)
+                self.finish(json.dumps({'error': 'Default configuration not available'}))
+                return
+            provider = defaults['provider']
+            model = defaults['model']
+            api_key = get_default_api_key(provider)
+        else:
+            provider = config.get('provider', DEFAULT_PROVIDER)
+            model = config.get('model', DEFAULT_MODEL)
+            api_key = config.get('apiKey')
 
         if not api_key:
             self.set_status(500)

@@ -180,12 +180,33 @@ Help:
 
 Fernet key for encrypting API keys. If absent, Settings UI shows warning; keys stored unencrypted (not recommended).
 
-### API Key
+### Default Configuration (Environment Variables)
 
-| Method | Use case |
-|--------|----------|
-| Panel settings | User brings own key |
-| `c.Mynerva.openai_api_key` | Default key for dev/shared environments |
+Administrators can provide default LLM settings via environment variables. Users can choose to use these defaults or configure their own.
+
+| Variable | Description |
+|----------|-------------|
+| `MYNERVA_OPENAI_API_KEY` | Default OpenAI API key |
+| `MYNERVA_ANTHROPIC_API_KEY` | Default Anthropic API key |
+| `MYNERVA_DEFAULT_PROVIDER` | Default provider (`openai` or `anthropic`) |
+| `MYNERVA_DEFAULT_MODEL` | Default model name (optional, uses first model if not set) |
+
+**Provider auto-detection:**
+- If only one API key is set, that provider is automatically selected
+- If both API keys are set, `MYNERVA_DEFAULT_PROVIDER` is required
+
+**Auto-initialization:** If `~/.mynerva/config.json` doesn't exist and defaults are available, it's automatically created with `useDefault: true`.
+
+**Security note:** API key environment variables are deleted after loading to prevent exposure in notebook cells.
+
+### User Configuration
+
+Users can configure their own settings via the panel settings UI:
+- Provider selection
+- Model selection
+- API key (encrypted if `MYNERVA_SECRET_KEY` is set)
+
+If default configuration is available, users can choose "Use default settings" instead of providing their own API key.
 
 ## Requirements
 
@@ -243,6 +264,16 @@ MYNERVA_SECRET_KEY=your-generated-key jupyter lab
 ```
 
 Without `MYNERVA_SECRET_KEY`, API keys are stored unencrypted in `~/.mynerva/config.json`.
+
+### Running with default API key
+
+Provide a default API key for users:
+
+```bash
+MYNERVA_OPENAI_API_KEY=sk-... MYNERVA_DEFAULT_PROVIDER=openai MYNERVA_DEFAULT_MODEL=gpt-5.2 jupyter lab
+```
+
+Users will see a "Use default settings" option in the settings UI.
 
 ### Packaging the extension
 

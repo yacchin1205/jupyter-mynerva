@@ -60,6 +60,18 @@
   font-weight: 500;
 }
 
+.jp-Mynerva-settings-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.jp-Mynerva-settings-checkbox input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+}
+
 .jp-Mynerva-settings-field input,
 .jp-Mynerva-settings-field select {
   width: 100%;
