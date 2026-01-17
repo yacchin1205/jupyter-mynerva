@@ -1,22 +1,28 @@
 import {
+  ILabShell,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
-import { requestAPI } from './request';
+import { activatePanel } from './panel';
 
-/**
- * Initialization data for the jupyter-mynerva extension.
- */
 const plugin: JupyterFrontEndPlugin<void> = {
   id: 'jupyter-mynerva:plugin',
-  description: 'A JupyterLab extension that provides an LLM-powered assistant with deep understanding of notebook structure.',
+  description:
+    'A JupyterLab extension that provides an LLM-powered assistant with deep understanding of notebook structure.',
   autoStart: true,
+  requires: [ILabShell],
   optional: [ISettingRegistry],
-  activate: (app: JupyterFrontEnd, settingRegistry: ISettingRegistry | null) => {
+  activate: (
+    app: JupyterFrontEnd,
+    shell: ILabShell,
+    settingRegistry: ISettingRegistry | null
+  ) => {
     console.log('JupyterLab extension jupyter-mynerva is activated!');
+
+    activatePanel(shell);
 
     if (settingRegistry) {
       settingRegistry
@@ -28,16 +34,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
           console.error('Failed to load settings for jupyter-mynerva.', reason);
         });
     }
-
-    requestAPI<any>('hello')
-      .then(data => {
-        console.log(data);
-      })
-      .catch(reason => {
-        console.error(
-          `The jupyter_mynerva server extension appears to be missing.\n${reason}`
-        );
-      });
   }
 };
 

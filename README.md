@@ -39,7 +39,7 @@ The LLM actively explores—requesting the table of contents, navigating section
                                          │ REST
 ┌────────────────────────────────────────▼────────────────┐
 │  Server Extension (Python)                              │
-│  - LLM proxy (OpenAI API)                               │
+│  - LLM proxy (OpenAI / Anthropic)                       │
 │  - Session storage (.mynerva files)                     │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -63,7 +63,7 @@ The LLM actively explores—requesting the table of contents, navigating section
 | Action confirmation | Batch confirmation supported; trust mode available |
 | Mutation validation | Optimistic locking via `_hash`; must read before write |
 | Error handling | API failure: retry with limit (3). Hash mismatch / user rejection: feedback to LLM, no retry count |
-| LLM providers | OpenAI initially; extensible to Anthropic, etc. |
+| LLM providers | OpenAI, Anthropic |
 
 ### UI
 
@@ -74,10 +74,10 @@ The LLM actively explores—requesting the table of contents, navigating section
 - Mutate preview (modal, diff view)
 - Trust mode toggle
 
-**Settings (JupyterLab Settings):**
+**Settings (gear icon in panel header):**
 - Provider selection
 - Model selection
-- API key (per provider, Fernet-encrypted if secret key present)
+- API key (Fernet-encrypted if secret key present)
 
 ## Actions
 
@@ -178,13 +178,13 @@ Help:
 
 `MYNERVA_SECRET_KEY` (env) or `c.Mynerva.secret_key` (traitlets)
 
-Fernet key for encrypting API keys in JupyterLab Settings. If absent, warning logged and Settings UI shows alert; keys stored unencrypted (not recommended).
+Fernet key for encrypting API keys. If absent, Settings UI shows warning; keys stored unencrypted (not recommended).
 
 ### API Key
 
 | Method | Use case |
 |--------|----------|
-| JupyterLab Settings | User brings own key |
+| Panel settings | User brings own key |
 | `c.Mynerva.openai_api_key` | Default key for dev/shared environments |
 
 ## Requirements
@@ -227,6 +227,22 @@ jlpm watch
 # Run JupyterLab in another terminal
 jupyter lab
 ```
+
+### Running with encryption
+
+Generate a Fernet key for API key encryption:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Run JupyterLab with the secret key:
+
+```bash
+MYNERVA_SECRET_KEY=your-generated-key jupyter lab
+```
+
+Without `MYNERVA_SECRET_KEY`, API keys are stored unencrypted in `~/.mynerva/config.json`.
 
 ### Packaging the extension
 

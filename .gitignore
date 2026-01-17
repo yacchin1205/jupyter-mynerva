@@ -122,3 +122,5 @@ dmypy.json
 
 # Yarn cache
 .yarn/
+
+.nbsearchignore
