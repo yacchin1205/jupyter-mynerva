@@ -191,6 +191,89 @@
   font-size: var(--jp-ui-font-size1);
 }
 
-.jp-Mynerva-send:hover {
+.jp-Mynerva-send:hover:not(:disabled) {
   background: var(--jp-brand-color0);
+}
+
+.jp-Mynerva-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action cards */
+.jp-Mynerva-actions {
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jp-Mynerva-action-card {
+  padding: 12px;
+  border-radius: 8px;
+  color: white;
+}
+
+.jp-Mynerva-query-action {
+  background: #2e7d32;
+}
+
+.jp-Mynerva-action-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.jp-Mynerva-action-icon {
+  font-size: 14px;
+}
+
+.jp-Mynerva-action-type {
+  font-weight: 600;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jp-Mynerva-action-label {
+  font-size: var(--jp-ui-font-size0);
+  opacity: 0.9;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.jp-Mynerva-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.jp-Mynerva-action-button {
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: var(--jp-ui-font-size0);
+}
+
+.jp-Mynerva-action-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.jp-Mynerva-action-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: var(--jp-ui-font-size0);
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.jp-Mynerva-shared-badge {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.jp-Mynerva-dismissed-badge {
+  background: rgba(255, 255, 255, 0.2);
+  opacity: 0.7;
 }

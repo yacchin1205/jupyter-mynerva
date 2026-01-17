@@ -5,24 +5,28 @@ import {
 } from '@jupyterlab/application';
 
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { INotebookTracker } from '@jupyterlab/notebook';
 
 import { activatePanel } from './panel';
+import { ContextEngine } from './context';
 
 const plugin: JupyterFrontEndPlugin<void> = {
   id: 'jupyter-mynerva:plugin',
   description:
     'A JupyterLab extension that provides an LLM-powered assistant with deep understanding of notebook structure.',
   autoStart: true,
-  requires: [ILabShell],
+  requires: [ILabShell, INotebookTracker],
   optional: [ISettingRegistry],
   activate: (
     app: JupyterFrontEnd,
     shell: ILabShell,
+    notebookTracker: INotebookTracker,
     settingRegistry: ISettingRegistry | null
   ) => {
     console.log('JupyterLab extension jupyter-mynerva is activated!');
 
-    activatePanel(shell);
+    const contextEngine = new ContextEngine(notebookTracker);
+    activatePanel(shell, contextEngine);
 
     if (settingRegistry) {
       settingRegistry

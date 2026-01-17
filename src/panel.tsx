@@ -7,11 +7,24 @@ import {
 } from '@jupyterlab/ui-components';
 import * as React from 'react';
 
+import { ContextEngine } from './context';
+import {
+  IAction,
+  IQueryAction,
+  ActionStatus,
+  parseRawContent,
+  validateActions,
+  QueryActionCard
+} from './actions';
+import { buildSystemPrompt } from './systemPrompt';
+
 const PANEL_CLASS = 'jp-Mynerva-panel';
 
 interface IMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
+  actions?: IAction[];
+  generated?: boolean;  // Auto-generated messages (show brief in UI)
 }
 
 interface IConfig {
@@ -241,21 +254,45 @@ function SettingsView({
   );
 }
 
+const QUERY_ACTION_TYPES = ['getToc', 'getSection', 'getCells', 'getOutput'];
+
+function isQueryAction(action: IAction): action is IQueryAction {
+  return QUERY_ACTION_TYPES.includes(action.type);
+}
+
 interface IChatViewProps {
   messages: IMessage[];
   onSendMessage: (content: string) => void;
+  onActionShare: (msgIndex: number, actionIndex: number, action: IAction) => void;
+  onActionDismiss: (msgIndex: number, actionIndex: number) => void;
+  getActionStatus: (msgIndex: number, actionIndex: number) => ActionStatus;
   loading: boolean;
+  hasPendingActions: boolean;
+}
+
+function getDisplayContent(msg: IMessage): string {
+  if (!msg.generated) {
+    return msg.content;
+  }
+  // For generated messages, show only the first line (e.g., "[Action Results]")
+  const firstLine = msg.content.split('\n')[0];
+  return firstLine;
 }
 
 function ChatView({
   messages,
   onSendMessage,
-  loading
+  onActionShare,
+  onActionDismiss,
+  getActionStatus,
+  loading,
+  hasPendingActions
 }: IChatViewProps): React.ReactElement {
   const [input, setInput] = React.useState('');
+  const inputDisabled = loading || hasPendingActions;
 
   const handleSend = () => {
-    if (!input.trim() || loading) {
+    if (!input.trim() || inputDisabled) {
       return;
     }
     onSendMessage(input);
@@ -279,11 +316,31 @@ function ChatView({
   return (
     <>
       <div className="jp-Mynerva-messages">
-        {messages.map((msg, i) => (
-          <div key={i} className={`jp-Mynerva-message jp-Mynerva-${msg.role}`}>
-            <div className="jp-Mynerva-message-content">{msg.content}</div>
-          </div>
-        ))}
+        {messages.map((msg, msgIndex) => {
+          const queryActions = (msg.actions || []).filter(isQueryAction);
+          return (
+            <React.Fragment key={msgIndex}>
+              {/* Assistant message (left side) */}
+              <div className={`jp-Mynerva-message jp-Mynerva-${msg.role}`}>
+                <div className="jp-Mynerva-message-content">{getDisplayContent(msg)}</div>
+              </div>
+              {/* Query actions (right side - user side) */}
+              {queryActions.length > 0 && (
+                <div className="jp-Mynerva-actions jp-Mynerva-user">
+                  {queryActions.map((action, actionIndex) => (
+                    <QueryActionCard
+                      key={actionIndex}
+                      action={action}
+                      status={getActionStatus(msgIndex, actionIndex)}
+                      onShare={() => onActionShare(msgIndex, actionIndex, action)}
+                      onDismiss={() => onActionDismiss(msgIndex, actionIndex)}
+                    />
+                  ))}
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
         {loading && (
           <div className="jp-Mynerva-message jp-Mynerva-assistant">
             <div className="jp-Mynerva-message-content">...</div>
@@ -296,14 +353,14 @@ function ChatView({
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask Mynerva..."
+          placeholder={hasPendingActions ? 'Please respond to pending actions...' : 'Ask Mynerva...'}
           rows={2}
-          disabled={loading}
+          disabled={inputDisabled}
         />
         <button
           className="jp-Mynerva-send"
           onClick={handleSend}
-          disabled={loading}
+          disabled={inputDisabled}
         >
           Send
         </button>
@@ -312,7 +369,13 @@ function ChatView({
   );
 }
 
-function MynervaComponent(): React.ReactElement {
+interface IMynervaComponentProps {
+  contextEngine: ContextEngine;
+}
+
+function MynervaComponent({
+  contextEngine
+}: IMynervaComponentProps): React.ReactElement {
   const [providers, setProviders] = React.useState<IProvider[]>([]);
   const [encryption, setEncryption] = React.useState(false);
   const [defaults, setDefaults] = React.useState<IDefaultConfig | null>(null);
@@ -345,6 +408,181 @@ function MynervaComponent(): React.ReactElement {
       });
   }, []);
 
+  // Track action statuses: messageIndex -> actionIndex -> status
+  const [actionStatuses, setActionStatuses] = React.useState<
+    Map<number, Map<number, ActionStatus>>
+  >(new Map());
+
+  // Queue of action results waiting to be sent
+  const [pendingResults, setPendingResults] = React.useState<string[]>([]);
+
+  const executeAction = (action: IAction): string => {
+    switch (action.type) {
+      case 'getToc': {
+        const toc = contextEngine.getToc();
+        return JSON.stringify({ type: 'getToc', result: toc }, null, 2);
+      }
+      case 'getSection': {
+        const cells = contextEngine.getSection(action.query);
+        return JSON.stringify({ type: 'getSection', result: cells }, null, 2);
+      }
+      case 'getCells': {
+        const cells = contextEngine.queryCells(action.query, action.count);
+        return JSON.stringify({ type: 'getCells', result: cells }, null, 2);
+      }
+      case 'getOutput': {
+        const outputs = contextEngine.getOutput(action.query);
+        return JSON.stringify({ type: 'getOutput', result: outputs }, null, 2);
+      }
+      case 'listHelp': {
+        return JSON.stringify({ type: 'listHelp', result: buildSystemPrompt() }, null, 2);
+      }
+      case 'help': {
+        return JSON.stringify({ type: 'help', result: `Help for action: ${action.action}` }, null, 2);
+      }
+      default:
+        return JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
+    }
+  };
+
+  const getActionStatus = (msgIndex: number, actionIndex: number): ActionStatus => {
+    return actionStatuses.get(msgIndex)?.get(actionIndex) ?? 'pending';
+  };
+
+  const hasPendingActions = messages.some((msg, msgIndex) =>
+    (msg.actions || []).some((_, actionIndex) =>
+      getActionStatus(msgIndex, actionIndex) === 'pending'
+    )
+  );
+
+  const setActionStatus = (msgIndex: number, actionIndex: number, status: ActionStatus) => {
+    setActionStatuses(prev => {
+      const newMap = new Map(prev);
+      if (!newMap.has(msgIndex)) {
+        newMap.set(msgIndex, new Map());
+      }
+      newMap.get(msgIndex)!.set(actionIndex, status);
+      return newMap;
+    });
+  };
+
+  const handleActionShare = (msgIndex: number, actionIndex: number, action: IAction) => {
+    setActionStatus(msgIndex, actionIndex, 'shared');
+
+    let result: string;
+    try {
+      result = executeAction(action);
+    } catch (e) {
+      result = JSON.stringify({
+        type: action.type,
+        error: e instanceof Error ? e.message : 'Unknown error'
+      }, null, 2);
+    }
+
+    setPendingResults(prev => [...prev, result]);
+  };
+
+  const handleActionDismiss = (msgIndex: number, actionIndex: number) => {
+    setActionStatus(msgIndex, actionIndex, 'dismissed');
+  };
+
+  // Send results when all actions are resolved
+  React.useEffect(() => {
+    if (hasPendingActions || pendingResults.length === 0 || loading) {
+      return;
+    }
+
+    const sendResults = async () => {
+      setLoading(true);
+      const results = pendingResults;
+      setPendingResults([]);
+
+      const feedbackMessage: IMessage = {
+        role: 'user',
+        content: `[Action Results]\n${results.join('\n\n')}`,
+        generated: true
+      };
+      const newMessages = [...messages, feedbackMessage];
+      setMessages(newMessages);
+
+      const chatMessages = [
+        { role: 'system' as const, content: buildSystemPrompt() },
+        ...newMessages
+      ];
+
+      try {
+        const response = await sendChat(chatMessages);
+        const finalMessages = await processLLMResponse(response, newMessages, 0);
+        setMessages(finalMessages);
+      } catch (e) {
+        const errorMessage: IMessage = {
+          role: 'assistant',
+          content: `Error: ${e instanceof Error ? e.message : 'Unknown error'}`
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    sendResults();
+  }, [hasPendingActions, pendingResults, loading]);
+
+  const processLLMResponse = async (
+    rawContent: string,
+    currentMessages: IMessage[],
+    retryCount: number
+  ): Promise<IMessage[]> => {
+    const MAX_RETRIES = 2;
+    const parseResult = parseRawContent(rawContent);
+
+    if (parseResult.warning) {
+      return [
+        ...currentMessages,
+        { role: 'assistant', content: rawContent }
+      ];
+    }
+
+    const llmResponse = parseResult.response!;
+    const validation = validateActions(llmResponse.actions);
+
+    const assistantContent = llmResponse.messages
+      .map(m => m.content)
+      .filter(Boolean)
+      .join('\n\n');
+
+    if (!validation.valid && retryCount < MAX_RETRIES) {
+      const assistantMessage: IMessage = {
+        role: 'assistant',
+        content: assistantContent || '(Action format error - retrying...)'
+      };
+      const feedbackMessage: IMessage = {
+        role: 'user',
+        content: validation.feedbackMessage!,
+        generated: true
+      };
+      const newMessages = [...currentMessages, assistantMessage, feedbackMessage];
+      setMessages(newMessages);
+
+      const chatMessages = [
+        { role: 'system' as const, content: buildSystemPrompt() },
+        ...newMessages
+      ];
+
+      const nextResponse = await sendChat(chatMessages);
+      return processLLMResponse(nextResponse, newMessages, retryCount + 1);
+    }
+
+    // Validation passed - include actions
+    const assistantMessage: IMessage = {
+      role: 'assistant',
+      content: assistantContent || '(no message)',
+      actions: llmResponse.actions as IAction[]
+    };
+
+    return [...currentMessages, assistantMessage];
+  };
+
   const handleSendMessage = async (content: string) => {
     const userMessage: IMessage = { role: 'user', content };
     const newMessages = [...messages, userMessage];
@@ -352,9 +590,13 @@ function MynervaComponent(): React.ReactElement {
     setLoading(true);
 
     try {
-      const response = await sendChat(newMessages);
-      const assistantMessage: IMessage = { role: 'assistant', content: response };
-      setMessages(prev => [...prev, assistantMessage]);
+      const chatMessages = [
+        { role: 'system' as const, content: buildSystemPrompt() },
+        ...newMessages
+      ];
+      const response = await sendChat(chatMessages);
+      const finalMessages = await processLLMResponse(response, newMessages, 0);
+      setMessages(finalMessages);
     } catch (e) {
       const errorMessage: IMessage = {
         role: 'assistant',
@@ -413,7 +655,11 @@ function MynervaComponent(): React.ReactElement {
         <ChatView
           messages={messages}
           onSendMessage={handleSendMessage}
+          onActionShare={handleActionShare}
+          onActionDismiss={handleActionDismiss}
+          getActionStatus={getActionStatus}
           loading={loading}
+          hasPendingActions={hasPendingActions}
         />
       )}
     </div>
@@ -421,8 +667,11 @@ function MynervaComponent(): React.ReactElement {
 }
 
 export class MynervaPanel extends ReactWidget {
-  constructor() {
+  private _contextEngine: ContextEngine;
+
+  constructor(contextEngine: ContextEngine) {
     super();
+    this._contextEngine = contextEngine;
     this.id = 'mynerva-panel';
     this.title.icon = consoleIcon;
     this.title.caption = 'Mynerva';
@@ -430,11 +679,11 @@ export class MynervaPanel extends ReactWidget {
   }
 
   render(): React.ReactElement {
-    return <MynervaComponent />;
+    return <MynervaComponent contextEngine={this._contextEngine} />;
   }
 }
 
-export function activatePanel(shell: ILabShell): void {
-  const panel = new MynervaPanel();
+export function activatePanel(shell: ILabShell, contextEngine: ContextEngine): void {
+  const panel = new MynervaPanel(contextEngine);
   shell.add(panel, 'right', { rank: 1000 });
 }
