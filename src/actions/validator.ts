@@ -2,6 +2,7 @@
  * Action schemas for validation
  */
 const ACTION_SCHEMAS: Record<string, { required: string[]; optional: string[] }> = {
+  // Query actions
   getToc: {
     required: [],
     optional: []
@@ -18,6 +19,24 @@ const ACTION_SCHEMAS: Record<string, { required: string[]; optional: string[] }>
     required: ['query'],
     optional: []
   },
+  // Mutate actions
+  insertCell: {
+    required: ['position', 'cellType', 'source'],
+    optional: []
+  },
+  updateCell: {
+    required: ['query', 'source'],
+    optional: []
+  },
+  deleteCell: {
+    required: ['query'],
+    optional: []
+  },
+  runCell: {
+    required: ['query'],
+    optional: []
+  },
+  // Help actions
   listHelp: {
     required: [],
     optional: []

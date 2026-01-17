@@ -11,10 +11,12 @@ import { ContextEngine } from './context';
 import {
   IAction,
   IQueryAction,
+  IMutateAction,
   ActionStatus,
   parseRawContent,
   validateActions,
-  QueryActionCard
+  QueryActionCard,
+  MutateActionCard
 } from './actions';
 import { buildSystemPrompt } from './systemPrompt';
 
@@ -255,9 +257,14 @@ function SettingsView({
 }
 
 const QUERY_ACTION_TYPES = ['getToc', 'getSection', 'getCells', 'getOutput'];
+const MUTATE_ACTION_TYPES = ['insertCell', 'updateCell', 'deleteCell', 'runCell'];
 
 function isQueryAction(action: IAction): action is IQueryAction {
   return QUERY_ACTION_TYPES.includes(action.type);
+}
+
+function isMutateAction(action: IAction): action is IMutateAction {
+  return MUTATE_ACTION_TYPES.includes(action.type);
 }
 
 interface IChatViewProps {
@@ -265,6 +272,10 @@ interface IChatViewProps {
   onSendMessage: (content: string) => void;
   onActionShare: (msgIndex: number, actionIndex: number, action: IAction) => void;
   onActionDismiss: (msgIndex: number, actionIndex: number) => void;
+  onActionApply: (msgIndex: number, actionIndex: number, action: IAction) => void;
+  onActionCancel: (msgIndex: number, actionIndex: number) => void;
+  onAcceptAll: (msgIndex: number) => void;
+  onRejectAll: (msgIndex: number) => void;
   getActionStatus: (msgIndex: number, actionIndex: number) => ActionStatus;
   loading: boolean;
   hasPendingActions: boolean;
@@ -284,6 +295,10 @@ function ChatView({
   onSendMessage,
   onActionShare,
   onActionDismiss,
+  onActionApply,
+  onActionCancel,
+  onAcceptAll,
+  onRejectAll,
   getActionStatus,
   loading,
   hasPendingActions
@@ -317,25 +332,74 @@ function ChatView({
     <>
       <div className="jp-Mynerva-messages">
         {messages.map((msg, msgIndex) => {
-          const queryActions = (msg.actions || []).filter(isQueryAction);
+          const actions = msg.actions || [];
+          const pendingCount = actions.filter(
+            (_, i) => getActionStatus(msgIndex, i) === 'pending'
+          ).length;
+          const hasPending = pendingCount > 0;
+
           return (
             <React.Fragment key={msgIndex}>
-              {/* Assistant message (left side) */}
+              {/* Message */}
               <div className={`jp-Mynerva-message jp-Mynerva-${msg.role}`}>
                 <div className="jp-Mynerva-message-content">{getDisplayContent(msg)}</div>
               </div>
-              {/* Query actions (right side - user side) */}
-              {queryActions.length > 0 && (
-                <div className="jp-Mynerva-actions jp-Mynerva-user">
-                  {queryActions.map((action, actionIndex) => (
-                    <QueryActionCard
-                      key={actionIndex}
-                      action={action}
-                      status={getActionStatus(msgIndex, actionIndex)}
-                      onShare={() => onActionShare(msgIndex, actionIndex, action)}
-                      onDismiss={() => onActionDismiss(msgIndex, actionIndex)}
-                    />
-                  ))}
+              {/* Actions with bulk header */}
+              {actions.length > 0 && (
+                <div className="jp-Mynerva-actions-container">
+                  {hasPending && actions.length > 1 && (
+                    <div className="jp-Mynerva-actions-header">
+                      <span className="jp-Mynerva-actions-count">
+                        {pendingCount} action{pendingCount > 1 ? 's' : ''}
+                      </span>
+                      <div className="jp-Mynerva-actions-bulk">
+                        <button
+                          className="jp-Mynerva-bulk-button jp-Mynerva-accept-all"
+                          onClick={() => onAcceptAll(msgIndex)}
+                        >
+                          Accept All
+                        </button>
+                        <button
+                          className="jp-Mynerva-bulk-button jp-Mynerva-reject-all"
+                          onClick={() => onRejectAll(msgIndex)}
+                        >
+                          Reject All
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Mutate actions (left side - assistant side) */}
+                  {actions.some(isMutateAction) && (
+                    <div className="jp-Mynerva-actions jp-Mynerva-assistant">
+                      {actions.map((action, actionIndex) =>
+                        isMutateAction(action) ? (
+                          <MutateActionCard
+                            key={actionIndex}
+                            action={action}
+                            status={getActionStatus(msgIndex, actionIndex)}
+                            onApply={() => onActionApply(msgIndex, actionIndex, action)}
+                            onCancel={() => onActionCancel(msgIndex, actionIndex)}
+                          />
+                        ) : null
+                      )}
+                    </div>
+                  )}
+                  {/* Query actions (right side - user side) */}
+                  {actions.some(isQueryAction) && (
+                    <div className="jp-Mynerva-actions jp-Mynerva-user">
+                      {actions.map((action, actionIndex) =>
+                        isQueryAction(action) ? (
+                          <QueryActionCard
+                            key={actionIndex}
+                            action={action}
+                            status={getActionStatus(msgIndex, actionIndex)}
+                            onShare={() => onActionShare(msgIndex, actionIndex, action)}
+                            onDismiss={() => onActionDismiss(msgIndex, actionIndex)}
+                          />
+                        ) : null
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </React.Fragment>
@@ -416,7 +480,7 @@ function MynervaComponent({
   // Queue of action results waiting to be sent
   const [pendingResults, setPendingResults] = React.useState<string[]>([]);
 
-  const executeAction = (action: IAction): string => {
+  const executeQueryAction = (action: IAction): string => {
     switch (action.type) {
       case 'getToc': {
         const toc = contextEngine.getToc();
@@ -439,6 +503,29 @@ function MynervaComponent({
       }
       case 'help': {
         return JSON.stringify({ type: 'help', result: `Help for action: ${action.action}` }, null, 2);
+      }
+      default:
+        return JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
+    }
+  };
+
+  const executeMutateAction = async (action: IAction): Promise<string> => {
+    switch (action.type) {
+      case 'insertCell': {
+        const result = contextEngine.insertCell(action.position, action.cellType, action.source);
+        return JSON.stringify({ type: 'insertCell', result }, null, 2);
+      }
+      case 'updateCell': {
+        const result = contextEngine.updateCell(action.query, action.source);
+        return JSON.stringify({ type: 'updateCell', result }, null, 2);
+      }
+      case 'deleteCell': {
+        const result = contextEngine.deleteCell(action.query);
+        return JSON.stringify({ type: 'deleteCell', result }, null, 2);
+      }
+      case 'runCell': {
+        const result = await contextEngine.runCell(action.query);
+        return JSON.stringify({ type: 'runCell', result }, null, 2);
       }
       default:
         return JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
@@ -471,7 +558,7 @@ function MynervaComponent({
 
     let result: string;
     try {
-      result = executeAction(action);
+      result = executeQueryAction(action);
     } catch (e) {
       result = JSON.stringify({
         type: action.type,
@@ -484,6 +571,59 @@ function MynervaComponent({
 
   const handleActionDismiss = (msgIndex: number, actionIndex: number) => {
     setActionStatus(msgIndex, actionIndex, 'dismissed');
+  };
+
+  const handleActionApply = async (msgIndex: number, actionIndex: number, action: IAction) => {
+    let result: string;
+    try {
+      result = await executeMutateAction(action);
+    } catch (e) {
+      result = JSON.stringify({
+        type: action.type,
+        error: e instanceof Error ? e.message : 'Unknown error'
+      }, null, 2);
+    }
+
+    setPendingResults(prev => [...prev, result]);
+    setActionStatus(msgIndex, actionIndex, 'applied');
+  };
+
+  const handleActionCancel = (msgIndex: number, actionIndex: number) => {
+    setActionStatus(msgIndex, actionIndex, 'cancelled');
+  };
+
+  const handleAcceptAll = async (msgIndex: number) => {
+    const msg = messages[msgIndex];
+    const actions = msg.actions || [];
+
+    for (let i = 0; i < actions.length; i++) {
+      if (getActionStatus(msgIndex, i) !== 'pending') {
+        continue;
+      }
+      const action = actions[i];
+      if (isQueryAction(action)) {
+        handleActionShare(msgIndex, i, action);
+      } else if (isMutateAction(action)) {
+        await handleActionApply(msgIndex, i, action);
+      }
+    }
+  };
+
+  const handleRejectAll = (msgIndex: number) => {
+    const msg = messages[msgIndex];
+    const actions = msg.actions || [];
+
+    for (let i = 0; i < actions.length; i++) {
+      if (getActionStatus(msgIndex, i) !== 'pending') {
+        continue;
+      }
+      const action = actions[i];
+      if (isQueryAction(action)) {
+        handleActionDismiss(msgIndex, i);
+      } else if (isMutateAction(action)) {
+        handleActionCancel(msgIndex, i);
+      }
+    }
   };
 
   // Send results when all actions are resolved
@@ -657,6 +797,10 @@ function MynervaComponent({
           onSendMessage={handleSendMessage}
           onActionShare={handleActionShare}
           onActionDismiss={handleActionDismiss}
+          onActionApply={handleActionApply}
+          onActionCancel={handleActionCancel}
+          onAcceptAll={handleAcceptAll}
+          onRejectAll={handleRejectAll}
           getActionStatus={getActionStatus}
           loading={loading}
           hasPendingActions={hasPendingActions}

@@ -201,6 +201,59 @@
 }
 
 /* Action cards */
+.jp-Mynerva-actions-container {
+  margin-bottom: 8px;
+}
+
+.jp-Mynerva-actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--jp-layout-color2);
+  border-radius: 8px;
+  border: 1px solid var(--jp-border-color1);
+}
+
+.jp-Mynerva-actions-count {
+  font-size: var(--jp-ui-font-size1);
+  font-weight: 500;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-Mynerva-actions-bulk {
+  display: flex;
+  gap: 8px;
+}
+
+.jp-Mynerva-bulk-button {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--jp-ui-font-size0);
+  font-weight: 500;
+}
+
+.jp-Mynerva-accept-all {
+  background: #2e7d32;
+  color: white;
+}
+
+.jp-Mynerva-accept-all:hover {
+  background: #1b5e20;
+}
+
+.jp-Mynerva-reject-all {
+  background: var(--jp-layout-color3);
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-Mynerva-reject-all:hover {
+  background: var(--jp-layout-color4);
+}
+
 .jp-Mynerva-actions {
   margin-bottom: 8px;
   display: flex;
@@ -216,6 +269,10 @@
 
 .jp-Mynerva-query-action {
   background: #2e7d32;
+}
+
+.jp-Mynerva-mutate-action {
+  background: #d84315;
 }
 
 .jp-Mynerva-action-header {
@@ -276,4 +333,31 @@
 .jp-Mynerva-dismissed-badge {
   background: rgba(255, 255, 255, 0.2);
   opacity: 0.7;
+}
+
+.jp-Mynerva-applied-badge {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.jp-Mynerva-cancelled-badge {
+  background: rgba(255, 255, 255, 0.2);
+  opacity: 0.7;
+}
+
+.jp-Mynerva-preview-toggle {
+  margin-bottom: 8px;
+}
+
+.jp-Mynerva-action-preview {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  font-size: var(--jp-ui-font-size0);
+  font-family: var(--jp-code-font-family);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
 }

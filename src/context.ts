@@ -376,4 +376,88 @@ export class ContextEngine {
     }
     return path;
   }
+
+  /**
+   * Insert a new cell
+   */
+  insertCell(
+    position: ICellQuery | 'end',
+    cellType: 'code' | 'markdown',
+    source: string
+  ): { index: number; id: string } {
+    const model = this.getNotebookModel();
+    const activeCellIndex = this.getActiveCellIndex();
+    const selectedIndices = this.getSelectedCellIndices();
+
+    let insertIndex: number;
+    if (position === 'end') {
+      insertIndex = model.cells.length;
+    } else {
+      insertIndex = this.findCellIndex(position, activeCellIndex, selectedIndices) + 1;
+    }
+
+    const cellModel = model.sharedModel.insertCell(insertIndex, {
+      cell_type: cellType,
+      source
+    });
+
+    return { index: insertIndex, id: cellModel.id };
+  }
+
+  /**
+   * Update cell source
+   */
+  updateCell(query: ICellQuery, source: string): { index: number; id: string } {
+    const model = this.getNotebookModel();
+    const activeCellIndex = this.getActiveCellIndex();
+    const selectedIndices = this.getSelectedCellIndices();
+    const index = this.findCellIndex(query, activeCellIndex, selectedIndices);
+    const cell = model.cells.get(index);
+
+    cell.sharedModel.source = source;
+
+    return { index, id: cell.id };
+  }
+
+  /**
+   * Delete a cell
+   */
+  deleteCell(query: ICellQuery): { index: number; id: string } {
+    const model = this.getNotebookModel();
+    const activeCellIndex = this.getActiveCellIndex();
+    const selectedIndices = this.getSelectedCellIndices();
+    const index = this.findCellIndex(query, activeCellIndex, selectedIndices);
+    const cell = model.cells.get(index);
+    const id = cell.id;
+
+    model.sharedModel.deleteCell(index);
+
+    return { index, id };
+  }
+
+  /**
+   * Run a cell
+   */
+  async runCell(query: ICellQuery): Promise<{ index: number; id: string }> {
+    const panel = this.notebookTracker.currentWidget;
+    if (!panel) {
+      throw new Error('No notebook is open');
+    }
+
+    const notebook = panel.content;
+    const model = this.getNotebookModel();
+    const activeCellIndex = this.getActiveCellIndex();
+    const selectedIndices = this.getSelectedCellIndices();
+    const index = this.findCellIndex(query, activeCellIndex, selectedIndices);
+    const cell = model.cells.get(index);
+
+    // Select the target cell
+    notebook.activeCellIndex = index;
+
+    // Import NotebookActions dynamically to run the cell
+    const { NotebookActions } = await import('@jupyterlab/notebook');
+    await NotebookActions.run(notebook, panel.sessionContext);
+
+    return { index, id: cell.id };
+  }
 }

@@ -17,6 +17,12 @@ Query (active notebook):
   - getCells: { "query": {...}, "count": N } - Get cell range from matched position
   - getOutput: { "query": {...} } - Get output of matched cell
 
+Mutate (active notebook):
+  - insertCell: { "position": {...} or "end", "cellType": "code"|"markdown", "source": "..." } - Insert new cell
+  - updateCell: { "query": {...}, "source": "..." } - Update cell content
+  - deleteCell: { "query": {...} } - Delete cell
+  - runCell: { "query": {...} } - Execute cell
+
 Query syntax:
   { "match": "regex" } - regex against heading/content
   { "contains": "text" } - substring match

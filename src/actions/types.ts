@@ -9,13 +9,22 @@ export interface ILLMResponse {
 }
 
 /**
- * Query action types
+ * Query action types (read-only, displayed on user side)
  */
 export type IQueryAction =
   | IGetTocAction
   | IGetSectionAction
   | IGetCellsAction
   | IGetOutputAction;
+
+/**
+ * Mutate action types (modify notebook, displayed on assistant side)
+ */
+export type IMutateAction =
+  | IInsertCellAction
+  | IUpdateCellAction
+  | IDeleteCellAction
+  | IRunCellAction;
 
 /**
  * Help action types
@@ -25,7 +34,7 @@ export type IHelpAction = IListHelpAction | IHelpDetailAction;
 /**
  * All action types
  */
-export type IAction = IQueryAction | IHelpAction;
+export type IAction = IQueryAction | IMutateAction | IHelpAction;
 
 export interface IGetTocAction {
   type: 'getToc';
@@ -57,9 +66,37 @@ export interface IHelpDetailAction {
 }
 
 /**
- * Action status for UI
+ * Mutate action interfaces
  */
-export type ActionStatus = 'pending' | 'shared' | 'dismissed';
+export interface IInsertCellAction {
+  type: 'insertCell';
+  position: ICellQuery | 'end';
+  cellType: 'code' | 'markdown';
+  source: string;
+}
+
+export interface IUpdateCellAction {
+  type: 'updateCell';
+  query: ICellQuery;
+  source: string;
+}
+
+export interface IDeleteCellAction {
+  type: 'deleteCell';
+  query: ICellQuery;
+}
+
+export interface IRunCellAction {
+  type: 'runCell';
+  query: ICellQuery;
+}
+
+/**
+ * Action status for UI
+ * Query: pending → shared | dismissed
+ * Mutate: pending → applied | cancelled
+ */
+export type ActionStatus = 'pending' | 'shared' | 'dismissed' | 'applied' | 'cancelled';
 
 /**
  * Action with status for tracking
