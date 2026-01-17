@@ -1,7 +1,10 @@
 /**
  * Action schemas for validation
  */
-const ACTION_SCHEMAS: Record<string, { required: string[]; optional: string[] }> = {
+const ACTION_SCHEMAS: Record<
+  string,
+  { required: string[]; optional: string[] }
+> = {
   // Query actions
   getToc: {
     required: [],
@@ -47,13 +50,19 @@ const ACTION_SCHEMAS: Record<string, { required: string[]; optional: string[] }>
   }
 };
 
-function findSimilarField(unknownField: string, knownFields: string[]): string | null {
+function findSimilarField(
+  unknownField: string,
+  knownFields: string[]
+): string | null {
   const lower = unknownField.toLowerCase();
   for (const field of knownFields) {
     if (field.toLowerCase() === lower) {
       return field;
     }
-    if (lower.includes(field.toLowerCase()) || field.toLowerCase().includes(lower)) {
+    if (
+      lower.includes(field.toLowerCase()) ||
+      field.toLowerCase().includes(lower)
+    ) {
       return field;
     }
   }
@@ -79,7 +88,9 @@ function validateAction(action: unknown, index: number): string[] {
   const schema = ACTION_SCHEMAS[type];
   if (!schema) {
     const knownTypes = Object.keys(ACTION_SCHEMAS).join(', ');
-    errors.push(`Action ${index}: Unknown action type "${type}". Valid types: ${knownTypes}`);
+    errors.push(
+      `Action ${index}: Unknown action type "${type}". Valid types: ${knownTypes}`
+    );
     return errors;
   }
 
@@ -87,7 +98,9 @@ function validateAction(action: unknown, index: number): string[] {
 
   for (const field of schema.required) {
     if (actionObj[field] === undefined || actionObj[field] === null) {
-      errors.push(`Action ${index} (${type}): Missing required field "${field}"`);
+      errors.push(
+        `Action ${index} (${type}): Missing required field "${field}"`
+      );
     }
   }
 
@@ -96,7 +109,9 @@ function validateAction(action: unknown, index: number): string[] {
     if (!allKnownFields.includes(key)) {
       const similar = findSimilarField(key, allKnownFields);
       if (similar) {
-        errors.push(`Action ${index} (${type}): Unknown field "${key}" (did you mean "${similar}"?)`);
+        errors.push(
+          `Action ${index} (${type}): Unknown field "${key}" (did you mean "${similar}"?)`
+        );
       } else {
         errors.push(
           `Action ${index} (${type}): Unknown field "${key}". Valid fields: ${allKnownFields.join(', ')}`
@@ -119,7 +134,8 @@ export function validateActions(actions: unknown): IValidationResult {
     return {
       valid: false,
       errors: ['Actions must be an array'],
-      feedbackMessage: '[Action Validation Error]\n\nActions must be an array.\n\nPlease correct the format and resend.'
+      feedbackMessage:
+        '[Action Validation Error]\n\nActions must be an array.\n\nPlease correct the format and resend.'
     };
   }
 

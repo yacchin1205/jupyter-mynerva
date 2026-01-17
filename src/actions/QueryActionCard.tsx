@@ -55,10 +55,14 @@ export function QueryActionCard({
         </div>
       )}
       {status === 'shared' && (
-        <div className="jp-Mynerva-action-badge jp-Mynerva-shared-badge">Shared</div>
+        <div className="jp-Mynerva-action-badge jp-Mynerva-shared-badge">
+          Shared
+        </div>
       )}
       {status === 'dismissed' && (
-        <div className="jp-Mynerva-action-badge jp-Mynerva-dismissed-badge">Dismissed</div>
+        <div className="jp-Mynerva-action-badge jp-Mynerva-dismissed-badge">
+          Dismissed
+        </div>
       )}
     </div>
   );

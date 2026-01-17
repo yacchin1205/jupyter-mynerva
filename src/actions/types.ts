@@ -96,7 +96,12 @@ export interface IRunCellAction {
  * Query: pending → shared | dismissed
  * Mutate: pending → applied | cancelled
  */
-export type ActionStatus = 'pending' | 'shared' | 'dismissed' | 'applied' | 'cancelled';
+export type ActionStatus =
+  | 'pending'
+  | 'shared'
+  | 'dismissed'
+  | 'applied'
+  | 'cancelled';
 
 /**
  * Action with status for tracking

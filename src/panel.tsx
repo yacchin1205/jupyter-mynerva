@@ -27,7 +27,7 @@ interface IMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   actions?: IAction[];
-  generated?: boolean;  // Auto-generated messages (show brief in UI)
+  generated?: boolean; // Auto-generated messages (show brief in UI)
 }
 
 interface IConfig {
@@ -61,7 +61,11 @@ async function getProviders(): Promise<IProvidersResponse> {
   const response = await ServerConnection.makeRequest(url, {}, settings);
 
   if (!response.ok) {
-    console.error('Failed to load providers', response.status, response.statusText);
+    console.error(
+      'Failed to load providers',
+      response.status,
+      response.statusText
+    );
     throw new Error(`Failed to load providers (${response.status})`);
   }
   return response.json();
@@ -73,7 +77,11 @@ async function getConfig(): Promise<IConfig> {
   const response = await ServerConnection.makeRequest(url, {}, settings);
 
   if (!response.ok) {
-    console.error('Failed to load config', response.status, response.statusText);
+    console.error(
+      'Failed to load config',
+      response.status,
+      response.statusText
+    );
     throw new Error(`Failed to load config (${response.status})`);
   }
   return response.json();
@@ -106,7 +114,9 @@ interface IChatResponse {
 function parseAssistantContent(data: IChatResponse): string {
   const { provider, response } = data;
   if (provider === 'openai') {
-    const choices = response.choices as Array<{ message?: { content?: string } }>;
+    const choices = response.choices as Array<{
+      message?: { content?: string };
+    }>;
     return choices?.[0]?.message?.content || JSON.stringify(response);
   } else if (provider === 'anthropic') {
     const content = response.content as Array<{ text?: string }>;
@@ -164,7 +174,8 @@ function SettingsView({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
 
-  const currentProvider = providers.find(p => p.id === provider) || providers[0];
+  const currentProvider =
+    providers.find(p => p.id === provider) || providers[0];
   const models = currentProvider?.models || [];
 
   const handleProviderChange = (newProvider: string) => {
@@ -193,7 +204,8 @@ function SettingsView({
     <div className="jp-Mynerva-settings">
       {defaultsUnavailable && (
         <div className="jp-Mynerva-settings-warning">
-          Default settings are no longer available. Please configure your own API key.
+          Default settings are no longer available. Please configure your own
+          API key.
         </div>
       )}
       {defaults && (
@@ -212,12 +224,16 @@ function SettingsView({
         <>
           {!encryption && (
             <div className="jp-Mynerva-settings-warning">
-              API keys are stored unencrypted. Set MYNERVA_SECRET_KEY for encryption.
+              API keys are stored unencrypted. Set MYNERVA_SECRET_KEY for
+              encryption.
             </div>
           )}
           <div className="jp-Mynerva-settings-field">
             <label>Provider</label>
-            <select value={provider} onChange={e => handleProviderChange(e.target.value)}>
+            <select
+              value={provider}
+              onChange={e => handleProviderChange(e.target.value)}
+            >
               {providers.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.displayName}
@@ -259,7 +275,12 @@ function SettingsView({
 }
 
 const QUERY_ACTION_TYPES = ['getToc', 'getSection', 'getCells', 'getOutput'];
-const MUTATE_ACTION_TYPES = ['insertCell', 'updateCell', 'deleteCell', 'runCell'];
+const MUTATE_ACTION_TYPES = [
+  'insertCell',
+  'updateCell',
+  'deleteCell',
+  'runCell'
+];
 
 function isQueryAction(action: IAction): action is IQueryAction {
   return QUERY_ACTION_TYPES.includes(action.type);
@@ -272,9 +293,17 @@ function isMutateAction(action: IAction): action is IMutateAction {
 interface IChatViewProps {
   messages: IMessage[];
   onSendMessage: (content: string) => void;
-  onActionShare: (msgIndex: number, actionIndex: number, action: IAction) => void;
+  onActionShare: (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => void;
   onActionDismiss: (msgIndex: number, actionIndex: number) => void;
-  onActionApply: (msgIndex: number, actionIndex: number, action: IAction) => void;
+  onActionApply: (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => void;
   onActionCancel: (msgIndex: number, actionIndex: number) => void;
   onAcceptAll: (msgIndex: number) => void;
   onRejectAll: (msgIndex: number) => void;
@@ -348,7 +377,9 @@ function ChatView({
             <React.Fragment key={msgIndex}>
               {/* Message */}
               <div className={`jp-Mynerva-message jp-Mynerva-${msg.role}`}>
-                <div className="jp-Mynerva-message-content">{getDisplayContent(msg)}</div>
+                <div className="jp-Mynerva-message-content">
+                  {getDisplayContent(msg)}
+                </div>
               </div>
               {/* Actions with bulk header */}
               {actions.length > 0 && (
@@ -383,8 +414,12 @@ function ChatView({
                             key={actionIndex}
                             action={action}
                             status={getActionStatus(msgIndex, actionIndex)}
-                            onApply={() => onActionApply(msgIndex, actionIndex, action)}
-                            onCancel={() => onActionCancel(msgIndex, actionIndex)}
+                            onApply={() =>
+                              onActionApply(msgIndex, actionIndex, action)
+                            }
+                            onCancel={() =>
+                              onActionCancel(msgIndex, actionIndex)
+                            }
                           />
                         ) : null
                       )}
@@ -399,8 +434,12 @@ function ChatView({
                             key={actionIndex}
                             action={action}
                             status={getActionStatus(msgIndex, actionIndex)}
-                            onShare={() => onActionShare(msgIndex, actionIndex, action)}
-                            onDismiss={() => onActionDismiss(msgIndex, actionIndex)}
+                            onShare={() =>
+                              onActionShare(msgIndex, actionIndex, action)
+                            }
+                            onDismiss={() =>
+                              onActionDismiss(msgIndex, actionIndex)
+                            }
                           />
                         ) : null
                       )}
@@ -423,7 +462,11 @@ function ChatView({
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={hasPendingActions ? 'Please respond to pending actions...' : 'Ask Mynerva...'}
+          placeholder={
+            hasPendingActions
+              ? 'Please respond to pending actions...'
+              : 'Ask Mynerva...'
+          }
           rows={2}
           disabled={inputDisabled}
         />
@@ -487,7 +530,7 @@ function MynervaComponent({
           setShowSettings(true);
         }
       })
-      .catch((e) => {
+      .catch(e => {
         setInitError(e instanceof Error ? e.message : 'Failed to initialize');
       })
       .finally(() => {
@@ -523,19 +566,35 @@ function MynervaComponent({
       }
       case 'getOutput': {
         const outputs = contextEngine.getOutput(action.query);
-        result = JSON.stringify({ type: 'getOutput', result: outputs }, null, 2);
+        result = JSON.stringify(
+          { type: 'getOutput', result: outputs },
+          null,
+          2
+        );
         break;
       }
       case 'listHelp': {
-        result = JSON.stringify({ type: 'listHelp', result: buildSystemPrompt() }, null, 2);
+        result = JSON.stringify(
+          { type: 'listHelp', result: buildSystemPrompt() },
+          null,
+          2
+        );
         break;
       }
       case 'help': {
-        result = JSON.stringify({ type: 'help', result: `Help for action: ${action.action}` }, null, 2);
+        result = JSON.stringify(
+          { type: 'help', result: `Help for action: ${action.action}` },
+          null,
+          2
+        );
         break;
       }
       default:
-        result = JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
+        result = JSON.stringify(
+          { type: 'unknown', error: 'Unknown action type' },
+          null,
+          2
+        );
     }
 
     if (filterEnabled && filters.length > 0) {
@@ -547,7 +606,11 @@ function MynervaComponent({
   const executeMutateAction = async (action: IAction): Promise<string> => {
     switch (action.type) {
       case 'insertCell': {
-        const result = contextEngine.insertCell(action.position, action.cellType, action.source);
+        const result = contextEngine.insertCell(
+          action.position,
+          action.cellType,
+          action.source
+        );
         return JSON.stringify({ type: 'insertCell', result }, null, 2);
       }
       case 'updateCell': {
@@ -563,21 +626,32 @@ function MynervaComponent({
         return JSON.stringify({ type: 'runCell', result }, null, 2);
       }
       default:
-        return JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
+        return JSON.stringify(
+          { type: 'unknown', error: 'Unknown action type' },
+          null,
+          2
+        );
     }
   };
 
-  const getActionStatus = (msgIndex: number, actionIndex: number): ActionStatus => {
+  const getActionStatus = (
+    msgIndex: number,
+    actionIndex: number
+  ): ActionStatus => {
     return actionStatuses.get(msgIndex)?.get(actionIndex) ?? 'pending';
   };
 
   const hasPendingActions = messages.some((msg, msgIndex) =>
-    (msg.actions || []).some((_, actionIndex) =>
-      getActionStatus(msgIndex, actionIndex) === 'pending'
+    (msg.actions || []).some(
+      (_, actionIndex) => getActionStatus(msgIndex, actionIndex) === 'pending'
     )
   );
 
-  const setActionStatus = (msgIndex: number, actionIndex: number, status: ActionStatus) => {
+  const setActionStatus = (
+    msgIndex: number,
+    actionIndex: number,
+    status: ActionStatus
+  ) => {
     setActionStatuses(prev => {
       const newMap = new Map(prev);
       if (!newMap.has(msgIndex)) {
@@ -588,7 +662,11 @@ function MynervaComponent({
     });
   };
 
-  const handleActionShare = (msgIndex: number, actionIndex: number, action: IAction) => {
+  const handleActionShare = (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => {
     setActionStatus(msgIndex, actionIndex, 'shared');
 
     let result: string;
@@ -596,10 +674,14 @@ function MynervaComponent({
       result = executeQueryAction(action);
     } catch (e) {
       console.error('Query action failed:', action.type, e);
-      result = JSON.stringify({
-        type: action.type,
-        error: e instanceof Error ? e.message : 'Unknown error'
-      }, null, 2);
+      result = JSON.stringify(
+        {
+          type: action.type,
+          error: e instanceof Error ? e.message : 'Unknown error'
+        },
+        null,
+        2
+      );
     }
 
     setPendingResults(prev => [...prev, result]);
@@ -609,16 +691,24 @@ function MynervaComponent({
     setActionStatus(msgIndex, actionIndex, 'dismissed');
   };
 
-  const handleActionApply = async (msgIndex: number, actionIndex: number, action: IAction) => {
+  const handleActionApply = async (
+    msgIndex: number,
+    actionIndex: number,
+    action: IAction
+  ) => {
     let result: string;
     try {
       result = await executeMutateAction(action);
     } catch (e) {
       console.error('Mutate action failed:', action.type, e);
-      result = JSON.stringify({
-        type: action.type,
-        error: e instanceof Error ? e.message : 'Unknown error'
-      }, null, 2);
+      result = JSON.stringify(
+        {
+          type: action.type,
+          error: e instanceof Error ? e.message : 'Unknown error'
+        },
+        null,
+        2
+      );
     }
 
     setPendingResults(prev => [...prev, result]);
@@ -689,7 +779,11 @@ function MynervaComponent({
 
       try {
         const response = await sendChat(chatMessages);
-        const finalMessages = await processLLMResponse(response, newMessages, 0);
+        const finalMessages = await processLLMResponse(
+          response,
+          newMessages,
+          0
+        );
         setMessages(finalMessages);
       } catch (e) {
         const errorMessage: IMessage = {
@@ -714,10 +808,7 @@ function MynervaComponent({
     const parseResult = parseRawContent(rawContent);
 
     if (parseResult.warning) {
-      return [
-        ...currentMessages,
-        { role: 'assistant', content: rawContent }
-      ];
+      return [...currentMessages, { role: 'assistant', content: rawContent }];
     }
 
     const llmResponse = parseResult.response!;
@@ -738,7 +829,11 @@ function MynervaComponent({
         content: validation.feedbackMessage!,
         generated: true
       };
-      const newMessages = [...currentMessages, assistantMessage, feedbackMessage];
+      const newMessages = [
+        ...currentMessages,
+        assistantMessage,
+        feedbackMessage
+      ];
       setMessages(newMessages);
 
       const chatMessages = [
@@ -879,7 +974,10 @@ export class MynervaPanel extends ReactWidget {
   }
 }
 
-export function activatePanel(shell: ILabShell, contextEngine: ContextEngine): void {
+export function activatePanel(
+  shell: ILabShell,
+  contextEngine: ContextEngine
+): void {
   const panel = new MynervaPanel(contextEngine);
   shell.add(panel, 'right', { rank: 1000 });
 }

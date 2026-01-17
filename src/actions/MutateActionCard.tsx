@@ -80,10 +80,14 @@ export function MutateActionCard({
         </>
       )}
       {status === 'applied' && (
-        <div className="jp-Mynerva-action-badge jp-Mynerva-applied-badge">Applied</div>
+        <div className="jp-Mynerva-action-badge jp-Mynerva-applied-badge">
+          Applied
+        </div>
       )}
       {status === 'cancelled' && (
-        <div className="jp-Mynerva-action-badge jp-Mynerva-cancelled-badge">Cancelled</div>
+        <div className="jp-Mynerva-action-badge jp-Mynerva-cancelled-badge">
+          Cancelled
+        </div>
       )}
     </div>
   );

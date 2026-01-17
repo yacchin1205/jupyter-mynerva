@@ -52,22 +52,23 @@ The LLM actively explores—requesting the table of contents, navigating section
 
 ### Design Decisions
 
-| Topic | Decision |
-|-------|----------|
-| Context extraction | TypeScript reimplementation of nbq |
-| Privacy filter | TypeScript, reads `.nbfilterrc.toml` for consistency with nbfilter |
-| Session storage | `.mynerva/*.mnchat` files, auto-named (timestamp + ID) |
-| Session lifecycle | Independent of active notebook; explicit switch only |
-| Streaming | Not supported |
-| File access | Jupyter root directory only |
-| Action confirmation | Batch confirmation supported; trust mode available |
-| Mutation validation | Optimistic locking via `_hash`; must read before write |
-| Error handling | API failure: retry with limit (3). Hash mismatch / user rejection: feedback to LLM, no retry count |
-| LLM providers | OpenAI, Anthropic |
+| Topic               | Decision                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| Context extraction  | TypeScript reimplementation of nbq                                                                 |
+| Privacy filter      | TypeScript, reads `.nbfilterrc.toml` for consistency with nbfilter                                 |
+| Session storage     | `.mynerva/*.mnchat` files, auto-named (timestamp + ID)                                             |
+| Session lifecycle   | Independent of active notebook; explicit switch only                                               |
+| Streaming           | Not supported                                                                                      |
+| File access         | Jupyter root directory only                                                                        |
+| Action confirmation | Batch confirmation supported; trust mode available                                                 |
+| Mutation validation | Optimistic locking via `_hash`; must read before write                                             |
+| Error handling      | API failure: retry with limit (3). Hash mismatch / user rejection: feedback to LLM, no retry count |
+| LLM providers       | OpenAI, Anthropic                                                                                  |
 
 ### UI
 
 **Panel (right sidebar):**
+
 - Session selector (dropdown + new)
 - Chat messages
 - Query preview (inline, with filter option)
@@ -75,6 +76,7 @@ The LLM actively explores—requesting the table of contents, navigating section
 - Trust mode toggle
 
 **Settings (gear icon in panel header):**
+
 - Provider selection
 - Model selection
 - API key (Fernet-encrypted if secret key present)
@@ -87,22 +89,22 @@ Query actions show a preview before sending to LLM. Users can choose to apply pr
 
 ### Query: Active Notebook
 
-| Action | Parameters | Description |
-|--------|------------|-------------|
-| `getToc` | — | Heading structure of current notebook |
-| `getSection` | `query` | Cells under matched heading |
-| `getCells` | `query`, `count?` | Cell range from matched position |
-| `getOutput` | `query` | Output of matched cell |
+| Action       | Parameters        | Description                           |
+| ------------ | ----------------- | ------------------------------------- |
+| `getToc`     | —                 | Heading structure of current notebook |
+| `getSection` | `query`           | Cells under matched heading           |
+| `getCells`   | `query`, `count?` | Cell range from matched position      |
+| `getOutput`  | `query`           | Output of matched cell                |
 
 ### Query: Other Files
 
-| Action | Parameters | Description |
-|--------|------------|-------------|
-| `listNotebookFiles` | `path?` | List notebooks in directory |
-| `getTocFromFile` | `path` | Heading structure of specified notebook |
-| `getSectionFromFile` | `path`, `query` | Cells under matched heading |
-| `getCellsFromFile` | `path`, `query`, `count?` | Cell range from matched position |
-| `getOutputFromFile` | `path`, `query` | Output of matched cell |
+| Action               | Parameters                | Description                             |
+| -------------------- | ------------------------- | --------------------------------------- |
+| `listNotebookFiles`  | `path?`                   | List notebooks in directory             |
+| `getTocFromFile`     | `path`                    | Heading structure of specified notebook |
+| `getSectionFromFile` | `path`, `query`           | Cells under matched heading             |
+| `getCellsFromFile`   | `path`, `query`, `count?` | Cell range from matched position        |
+| `getOutputFromFile`  | `path`, `query`           | Output of matched cell                  |
 
 ### Query Syntax
 
@@ -115,19 +117,19 @@ Query actions show a preview before sending to LLM. Users can choose to apply pr
 
 ### Mutate: Active Notebook
 
-| Action | Parameters | Description |
-|--------|------------|-------------|
-| `insertCell` | `position`, `cellType`, `content` | Insert above/below current cell |
-| `replaceCell` | `query`, `content` | Replace cell content |
-| `deleteCell` | `query` | Delete cell |
-| `executeCell` | `query?` | Execute cell (default: current) |
+| Action        | Parameters                        | Description                     |
+| ------------- | --------------------------------- | ------------------------------- |
+| `insertCell`  | `position`, `cellType`, `content` | Insert above/below current cell |
+| `replaceCell` | `query`, `content`                | Replace cell content            |
+| `deleteCell`  | `query`                           | Delete cell                     |
+| `executeCell` | `query?`                          | Execute cell (default: current) |
 
 ### Help (no confirmation required)
 
-| Action | Parameters | Description |
-|--------|------------|-------------|
-| `listHelp` | — | Show available actions (re-display system prompt) |
-| `help` | `action` | Show details for specific action |
+| Action     | Parameters | Description                                       |
+| ---------- | ---------- | ------------------------------------------------- |
+| `listHelp` | —          | Show available actions (re-display system prompt) |
+| `help`     | `action`   | Show details for specific action                  |
 
 ## System Prompt
 
@@ -184,14 +186,15 @@ Fernet key for encrypting API keys. If absent, Settings UI shows warning; keys s
 
 Administrators can provide default LLM settings via environment variables. Users can choose to use these defaults or configure their own.
 
-| Variable | Description |
-|----------|-------------|
-| `MYNERVA_OPENAI_API_KEY` | Default OpenAI API key |
-| `MYNERVA_ANTHROPIC_API_KEY` | Default Anthropic API key |
-| `MYNERVA_DEFAULT_PROVIDER` | Default provider (`openai` or `anthropic`) |
-| `MYNERVA_DEFAULT_MODEL` | Default model name (optional, uses first model if not set) |
+| Variable                    | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `MYNERVA_OPENAI_API_KEY`    | Default OpenAI API key                                     |
+| `MYNERVA_ANTHROPIC_API_KEY` | Default Anthropic API key                                  |
+| `MYNERVA_DEFAULT_PROVIDER`  | Default provider (`openai` or `anthropic`)                 |
+| `MYNERVA_DEFAULT_MODEL`     | Default model name (optional, uses first model if not set) |
 
 **Provider auto-detection:**
+
 - If only one API key is set, that provider is automatically selected
 - If both API keys are set, `MYNERVA_DEFAULT_PROVIDER` is required
 
@@ -202,6 +205,7 @@ Administrators can provide default LLM settings via environment variables. Users
 ### User Configuration
 
 Users can configure their own settings via the panel settings UI:
+
 - Provider selection
 - Model selection
 - API key (encrypted if `MYNERVA_SECRET_KEY` is set)

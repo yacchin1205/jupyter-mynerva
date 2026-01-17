@@ -67,7 +67,7 @@
   cursor: pointer;
 }
 
-.jp-Mynerva-settings-checkbox input[type="checkbox"] {
+.jp-Mynerva-settings-checkbox input[type='checkbox'] {
   width: auto;
   padding: 0;
 }
@@ -195,7 +195,7 @@
   cursor: pointer;
 }
 
-.jp-Mynerva-filter-toggle input[type="checkbox"] {
+.jp-Mynerva-filter-toggle input[type='checkbox'] {
   margin: 0;
 }
 
@@ -209,13 +209,13 @@
   font-size: var(--jp-ui-font-size1);
 }
 
-.jp-Mynerva-send:hover:not(:disabled) {
-  background: var(--jp-brand-color0);
-}
-
 .jp-Mynerva-send:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.jp-Mynerva-send:hover:not(:disabled) {
+  background: var(--jp-brand-color0);
 }
 
 /* Action cards */
@@ -323,7 +323,7 @@
 
 .jp-Mynerva-action-button {
   padding: 4px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgb(255 255 255 / 50%);
   border-radius: 4px;
   background: transparent;
   color: white;
@@ -332,7 +332,7 @@
 }
 
 .jp-Mynerva-action-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(255 255 255 / 10%);
 }
 
 .jp-Mynerva-action-badge {
@@ -341,24 +341,24 @@
   border-radius: 12px;
   font-size: var(--jp-ui-font-size0);
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(255 255 255 / 20%);
 }
 
 .jp-Mynerva-shared-badge {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgb(255 255 255 / 30%);
 }
 
 .jp-Mynerva-dismissed-badge {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(255 255 255 / 20%);
   opacity: 0.7;
 }
 
 .jp-Mynerva-applied-badge {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgb(255 255 255 / 30%);
 }
 
 .jp-Mynerva-cancelled-badge {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(255 255 255 / 20%);
   opacity: 0.7;
 }
 
@@ -369,13 +369,12 @@
 .jp-Mynerva-action-preview {
   margin: 8px 0;
   padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgb(0 0 0 / 20%);
   border-radius: 4px;
   font-size: var(--jp-ui-font-size0);
   font-family: var(--jp-code-font-family);
-  overflow-x: auto;
+  overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 200px;
-  overflow-y: auto;
 }

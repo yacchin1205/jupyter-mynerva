@@ -124,7 +124,9 @@ export class ContextEngine {
   private getCellAt(index: number): ICellModel {
     const model = this.getNotebookModel();
     if (index < 0 || index >= model.cells.length) {
-      throw new Error(`Cell index ${index} out of range (0-${model.cells.length - 1})`);
+      throw new Error(
+        `Cell index ${index} out of range (0-${model.cells.length - 1})`
+      );
     }
     return model.cells.get(index);
   }
@@ -151,7 +153,10 @@ export class ContextEngine {
 
       if (output.type === 'stream') {
         outputData.text = (output as any).text;
-      } else if (output.type === 'execute_result' || output.type === 'display_data') {
+      } else if (
+        output.type === 'execute_result' ||
+        output.type === 'display_data'
+      ) {
         outputData.data = (output as any).data;
         const textPlain = (output as any).data?.['text/plain'];
         if (textPlain) {
@@ -246,7 +251,15 @@ export class ContextEngine {
   ): number {
     const model = this.getNotebookModel();
     for (let i = 0; i < model.cells.length; i++) {
-      if (this.matchesQuery(model.cells.get(i), i, query, activeCellIndex, selectedIndices)) {
+      if (
+        this.matchesQuery(
+          model.cells.get(i),
+          i,
+          query,
+          activeCellIndex,
+          selectedIndices
+        )
+      ) {
         return i;
       }
     }
@@ -287,13 +300,19 @@ export class ContextEngine {
     const model = this.getNotebookModel();
     const activeCellIndex = this.getActiveCellIndex();
     const selectedIndices = this.getSelectedCellIndices();
-    const startIndex = this.findCellIndex(query, activeCellIndex, selectedIndices);
+    const startIndex = this.findCellIndex(
+      query,
+      activeCellIndex,
+      selectedIndices
+    );
     const startCell = model.cells.get(startIndex);
 
     const heading = this.parseHeading(startCell.sharedModel.source);
     if (!heading) {
       // Not a heading cell, return just this cell
-      return [this.cellToData(startCell, startIndex, activeCellIndex, selectedIndices)];
+      return [
+        this.cellToData(startCell, startIndex, activeCellIndex, selectedIndices)
+      ];
     }
 
     const sectionCells: ICellData[] = [
@@ -308,7 +327,9 @@ export class ContextEngine {
         break;
       }
 
-      sectionCells.push(this.cellToData(cell, i, activeCellIndex, selectedIndices));
+      sectionCells.push(
+        this.cellToData(cell, i, activeCellIndex, selectedIndices)
+      );
     }
 
     return sectionCells;
@@ -321,14 +342,20 @@ export class ContextEngine {
     const model = this.getNotebookModel();
     const activeCellIndex = this.getActiveCellIndex();
     const selectedIndices = this.getSelectedCellIndices();
-    const startIndex = this.findCellIndex(query, activeCellIndex, selectedIndices);
+    const startIndex = this.findCellIndex(
+      query,
+      activeCellIndex,
+      selectedIndices
+    );
     const endIndex = count
       ? Math.min(startIndex + count, model.cells.length)
       : model.cells.length;
 
     const result: ICellData[] = [];
     for (let i = startIndex; i < endIndex; i++) {
-      result.push(this.cellToData(model.cells.get(i), i, activeCellIndex, selectedIndices));
+      result.push(
+        this.cellToData(model.cells.get(i), i, activeCellIndex, selectedIndices)
+      );
     }
 
     return result;
@@ -344,7 +371,9 @@ export class ContextEngine {
     const cell = this.getCellAt(index);
 
     if (cell.type !== 'code') {
-      throw new Error(`Cell at index ${index} is not a code cell (type: ${cell.type})`);
+      throw new Error(
+        `Cell at index ${index} is not a code cell (type: ${cell.type})`
+      );
     }
 
     const outputs = this.getCellOutputs(cell);
@@ -393,7 +422,8 @@ export class ContextEngine {
     if (position === 'end') {
       insertIndex = model.cells.length;
     } else {
-      insertIndex = this.findCellIndex(position, activeCellIndex, selectedIndices) + 1;
+      insertIndex =
+        this.findCellIndex(position, activeCellIndex, selectedIndices) + 1;
     }
 
     const cellModel = model.sharedModel.insertCell(insertIndex, {
