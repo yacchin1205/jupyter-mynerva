@@ -19,6 +19,7 @@ import {
   MutateActionCard
 } from './actions';
 import { buildSystemPrompt } from './systemPrompt';
+import { IFilter, applyFilters } from './filter';
 
 const PANEL_CLASS = 'jp-Mynerva-panel';
 
@@ -51,6 +52,7 @@ interface IProvidersResponse {
   providers: IProvider[];
   encryption: boolean;
   defaults: IDefaultConfig | null;
+  filters: IFilter[];
 }
 
 async function getProviders(): Promise<IProvidersResponse> {
@@ -279,6 +281,8 @@ interface IChatViewProps {
   getActionStatus: (msgIndex: number, actionIndex: number) => ActionStatus;
   loading: boolean;
   hasPendingActions: boolean;
+  filterEnabled: boolean;
+  onFilterToggle: (enabled: boolean) => void;
 }
 
 function getDisplayContent(msg: IMessage): string {
@@ -301,7 +305,9 @@ function ChatView({
   onRejectAll,
   getActionStatus,
   loading,
-  hasPendingActions
+  hasPendingActions,
+  filterEnabled,
+  onFilterToggle
 }: IChatViewProps): React.ReactElement {
   const [input, setInput] = React.useState('');
   const inputDisabled = loading || hasPendingActions;
@@ -421,13 +427,23 @@ function ChatView({
           rows={2}
           disabled={inputDisabled}
         />
-        <button
-          className="jp-Mynerva-send"
-          onClick={handleSend}
-          disabled={inputDisabled}
-        >
-          Send
-        </button>
+        <div className="jp-Mynerva-input-controls">
+          <label className="jp-Mynerva-filter-toggle">
+            <input
+              type="checkbox"
+              checked={filterEnabled}
+              onChange={e => onFilterToggle(e.target.checked)}
+            />
+            Privacy filter (.nbfilterrc.toml)
+          </label>
+          <button
+            className="jp-Mynerva-send"
+            onClick={handleSend}
+            disabled={inputDisabled}
+          >
+            Send
+          </button>
+        </div>
       </div>
     </>
   );
@@ -448,13 +464,20 @@ function MynervaComponent({
   const [messages, setMessages] = React.useState<IMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [initializing, setInitializing] = React.useState(true);
+  const [initError, setInitError] = React.useState<string | null>(null);
+  const [filters, setFilters] = React.useState<IFilter[]>([]);
+  const [filterEnabled, setFilterEnabled] = React.useState(true);
 
   React.useEffect(() => {
     Promise.all([getProviders(), getConfig()])
       .then(([providersRes, cfg]) => {
+        if (!providersRes.filters) {
+          throw new Error('Server did not return privacy filter configuration');
+        }
         setProviders(providersRes.providers);
         setEncryption(providersRes.encryption);
         setDefaults(providersRes.defaults);
+        setFilters(providersRes.filters);
         setConfig(cfg);
         // Show settings if:
         // - no API key and not using defaults, OR
@@ -464,8 +487,8 @@ function MynervaComponent({
           setShowSettings(true);
         }
       })
-      .catch(() => {
-        setShowSettings(true);
+      .catch((e) => {
+        setInitError(e instanceof Error ? e.message : 'Failed to initialize');
       })
       .finally(() => {
         setInitializing(false);
@@ -481,32 +504,44 @@ function MynervaComponent({
   const [pendingResults, setPendingResults] = React.useState<string[]>([]);
 
   const executeQueryAction = (action: IAction): string => {
+    let result: string;
     switch (action.type) {
       case 'getToc': {
         const toc = contextEngine.getToc();
-        return JSON.stringify({ type: 'getToc', result: toc }, null, 2);
+        result = JSON.stringify({ type: 'getToc', result: toc }, null, 2);
+        break;
       }
       case 'getSection': {
         const cells = contextEngine.getSection(action.query);
-        return JSON.stringify({ type: 'getSection', result: cells }, null, 2);
+        result = JSON.stringify({ type: 'getSection', result: cells }, null, 2);
+        break;
       }
       case 'getCells': {
         const cells = contextEngine.queryCells(action.query, action.count);
-        return JSON.stringify({ type: 'getCells', result: cells }, null, 2);
+        result = JSON.stringify({ type: 'getCells', result: cells }, null, 2);
+        break;
       }
       case 'getOutput': {
         const outputs = contextEngine.getOutput(action.query);
-        return JSON.stringify({ type: 'getOutput', result: outputs }, null, 2);
+        result = JSON.stringify({ type: 'getOutput', result: outputs }, null, 2);
+        break;
       }
       case 'listHelp': {
-        return JSON.stringify({ type: 'listHelp', result: buildSystemPrompt() }, null, 2);
+        result = JSON.stringify({ type: 'listHelp', result: buildSystemPrompt() }, null, 2);
+        break;
       }
       case 'help': {
-        return JSON.stringify({ type: 'help', result: `Help for action: ${action.action}` }, null, 2);
+        result = JSON.stringify({ type: 'help', result: `Help for action: ${action.action}` }, null, 2);
+        break;
       }
       default:
-        return JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
+        result = JSON.stringify({ type: 'unknown', error: 'Unknown action type' }, null, 2);
     }
+
+    if (filterEnabled && filters.length > 0) {
+      result = applyFilters(result, filters);
+    }
+    return result;
   };
 
   const executeMutateAction = async (action: IAction): Promise<string> => {
@@ -560,6 +595,7 @@ function MynervaComponent({
     try {
       result = executeQueryAction(action);
     } catch (e) {
+      console.error('Query action failed:', action.type, e);
       result = JSON.stringify({
         type: action.type,
         error: e instanceof Error ? e.message : 'Unknown error'
@@ -578,6 +614,7 @@ function MynervaComponent({
     try {
       result = await executeMutateAction(action);
     } catch (e) {
+      console.error('Mutate action failed:', action.type, e);
       result = JSON.stringify({
         type: action.type,
         error: e instanceof Error ? e.message : 'Unknown error'
@@ -764,6 +801,19 @@ function MynervaComponent({
     );
   }
 
+  if (initError) {
+    return (
+      <div className={PANEL_CLASS}>
+        <div className="jp-Mynerva-header">
+          <span className="jp-Mynerva-title">Mynerva</span>
+        </div>
+        <div className="jp-Mynerva-settings">
+          <div className="jp-Mynerva-settings-error">{initError}</div>
+        </div>
+      </div>
+    );
+  }
+
   const defaultConfig: IConfig = {
     provider: providers[0]?.id || 'openai',
     model: providers[0]?.models[0] || '',
@@ -804,6 +854,8 @@ function MynervaComponent({
           getActionStatus={getActionStatus}
           loading={loading}
           hasPendingActions={hasPendingActions}
+          filterEnabled={filterEnabled}
+          onFilterToggle={setFilterEnabled}
         />
       )}
     </div>

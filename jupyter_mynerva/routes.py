@@ -1,6 +1,12 @@
 import json
 import os
+import re
 from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 from jupyter_server.base.handlers import APIHandler
 from jupyter_server.utils import url_path_join
@@ -39,6 +45,54 @@ PROVIDERS = [
 DEFAULT_PROVIDER = 'openai'
 DEFAULT_MODEL = 'gpt-5.2'
 ENCRYPTED_PREFIX = 'encrypted:'
+
+# Default privacy filters (same as nbfilter)
+DEFAULT_FILTERS = [
+    {
+        'pattern': r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b',
+        'label': '[IPv4_#]'
+    },
+    {
+        'pattern': r'[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.(com|org|net|jp|io|dev|local|internal)',
+        'label': '[DOMAIN_#]'
+    }
+]
+
+
+def load_filters():
+    """Load filters from ~/.nbfilterrc.toml or return defaults.
+
+    Raises ValueError if config file exists but is invalid.
+    """
+    config_path = Path.home() / '.nbfilterrc.toml'
+    if not config_path.exists():
+        return DEFAULT_FILTERS
+
+    with open(config_path, 'rb') as f:
+        config = tomllib.load(f)
+
+    filters = config.get('filters', [])
+    if not filters:
+        return DEFAULT_FILTERS
+
+    result = []
+    for i, f in enumerate(filters):
+        if 'pattern' not in f:
+            raise ValueError(f"Filter {i}: missing 'pattern' field")
+        if 'label' not in f:
+            raise ValueError(f"Filter {i}: missing 'label' field")
+
+        try:
+            re.compile(f['pattern'])
+        except re.error as e:
+            raise ValueError(f"Filter {i}: invalid regex '{f['pattern']}': {e}")
+
+        result.append({
+            'pattern': f['pattern'],
+            'label': f['label']
+        })
+
+    return result
 
 # Load default config from environment variables (and delete secrets)
 _DEFAULT_CONFIG = {}
@@ -185,10 +239,18 @@ def is_encryption_configured():
 class ProvidersHandler(APIHandler):
     @tornado.web.authenticated
     def get(self):
+        try:
+            filters = load_filters()
+        except (ValueError, tomllib.TOMLDecodeError) as e:
+            self.set_status(500)
+            self.finish(json.dumps({'error': f'Filter config error: {e}'}))
+            return
+
         self.finish(json.dumps({
             'providers': PROVIDERS,
             'encryption': is_encryption_configured(),
-            'defaults': get_default_config()
+            'defaults': get_default_config(),
+            'filters': filters
         }))
 
 

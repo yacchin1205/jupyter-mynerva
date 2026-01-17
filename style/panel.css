@@ -180,8 +180,26 @@
   border-color: var(--jp-brand-color1);
 }
 
+.jp-Mynerva-input-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jp-Mynerva-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--jp-ui-font-size0);
+  color: var(--jp-ui-font-color2);
+  cursor: pointer;
+}
+
+.jp-Mynerva-filter-toggle input[type="checkbox"] {
+  margin: 0;
+}
+
 .jp-Mynerva-send {
-  align-self: flex-end;
   padding: 4px 16px;
   border: none;
   border-radius: 4px;
