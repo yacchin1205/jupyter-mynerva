@@ -275,11 +275,33 @@ def chat_openai(api_key, model, messages):
 
 def chat_anthropic(api_key, model, messages):
     client = Anthropic(api_key=api_key)
-    response = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        messages=messages
-    )
+
+    api_messages = []
+    system_text = None
+    for m in messages:
+        role = m.get('role')
+        content = m.get('content', '')
+        actions = m.get('actions')
+        if actions:
+            content += '\n\n[Actions proposed]\n' + json.dumps(actions)
+
+        if role == 'system':
+            if system_text is None:
+                system_text = content
+            else:
+                system_text += '\n\n' + content
+        else:
+            api_messages.append({'role': role, 'content': content})
+
+    kwargs = {
+        'model': model,
+        'max_tokens': 4096,
+        'messages': api_messages
+    }
+    if system_text:
+        kwargs['system'] = system_text
+
+    response = client.messages.create(**kwargs)
     return {'provider': 'anthropic', 'response': response.model_dump()}
 
 
