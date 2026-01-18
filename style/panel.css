@@ -15,8 +15,17 @@
 }
 
 .jp-Mynerva-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   font-size: var(--jp-ui-font-size1);
+}
+
+.jp-Mynerva-title-icon {
+  width: 16px;
+  height: 16px;
+  transform: translateY(2px);
 }
 
 .jp-Mynerva-header-button {

@@ -1,5 +1,9 @@
 # jupyter-mynerva
 
+<p align="center">
+  <img src="images/logo.png" alt="Mynerva Logo" width="400">
+</p>
+
 [![Github Actions Status](https://github.com/yacchin1205/jupyter-mynerva/workflows/Build/badge.svg)](https://github.com/yacchin1205/jupyter-mynerva/actions/workflows/build.yml)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/yacchin1205/jupyter-mynerva/main?urlpath=lab)
 

@@ -1,10 +1,6 @@
 import { ILabShell } from '@jupyterlab/application';
 import { ServerConnection } from '@jupyterlab/services';
-import {
-  ReactWidget,
-  consoleIcon,
-  settingsIcon
-} from '@jupyterlab/ui-components';
+import { ReactWidget, settingsIcon } from '@jupyterlab/ui-components';
 import * as React from 'react';
 import { marked } from 'marked';
 
@@ -24,6 +20,7 @@ import {
 import { buildSystemPrompt } from './systemPrompt';
 import { IFilter, applyFilters } from './filter';
 import { NotebookFileReader } from './notebookFile';
+import { mynervaIcon } from './icons';
 
 const PANEL_CLASS = 'jp-Mynerva-panel';
 
@@ -1452,7 +1449,10 @@ function MynervaComponent({
     return (
       <div className={PANEL_CLASS}>
         <div className="jp-Mynerva-header">
-          <span className="jp-Mynerva-title">Mynerva</span>
+          <span className="jp-Mynerva-title">
+            <mynervaIcon.react tag="span" className="jp-Mynerva-title-icon" />
+            MYNERVA
+          </span>
         </div>
         <div className="jp-Mynerva-loading">Loading...</div>
       </div>
@@ -1463,7 +1463,10 @@ function MynervaComponent({
     return (
       <div className={PANEL_CLASS}>
         <div className="jp-Mynerva-header">
-          <span className="jp-Mynerva-title">Mynerva</span>
+          <span className="jp-Mynerva-title">
+            <mynervaIcon.react tag="span" className="jp-Mynerva-title-icon" />
+            MYNERVA
+          </span>
         </div>
         <div className="jp-Mynerva-settings">
           <div className="jp-Mynerva-settings-error">{initError}</div>
@@ -1483,7 +1486,10 @@ function MynervaComponent({
   return (
     <div className={PANEL_CLASS}>
       <div className="jp-Mynerva-header">
-        <span className="jp-Mynerva-title">Mynerva</span>
+        <span className="jp-Mynerva-title">
+          <mynervaIcon.react tag="span" className="jp-Mynerva-title-icon" />
+          MYNERVA
+        </span>
         <div className="jp-Mynerva-header-buttons">
           <div className="jp-Mynerva-session-dropdown">
             <button
@@ -1588,7 +1594,7 @@ export class MynervaPanel extends ReactWidget {
     super();
     this._contextEngine = contextEngine;
     this.id = 'mynerva-panel';
-    this.title.icon = consoleIcon;
+    this.title.icon = mynervaIcon;
     this.title.caption = 'Mynerva';
     this.addClass(PANEL_CLASS);
   }
