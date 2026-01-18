@@ -2076,6 +2076,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/marked@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "@types/marked@npm:6.0.0"
+  dependencies:
+    marked: "*"
+  checksum: ad4cd5a405604b27efb4d3979b05869f3069529d1f5b2a38039de7c96e57270f03e7580efe327ca1c136ec22a355d0a7d8578346bd2af8397fdd6bb76ca1b084
+  languageName: node
+  linkType: hard
+
 "@types/minimist@npm:^1.2.2":
   version: 1.2.5
   resolution: "@types/minimist@npm:1.2.5"
@@ -5115,6 +5124,7 @@ __metadata:
     "@jupyterlab/settingregistry": ^4.0.0
     "@jupyterlab/ui-components": ^4.0.0
     "@types/json-schema": ^7.0.11
+    "@types/marked": ^6.0.0
     "@types/react": ^18.0.26
     "@types/react-addons-linked-state-mixin": ^0.14.22
     "@typescript-eslint/eslint-plugin": ^6.1.0
@@ -5123,6 +5133,7 @@ __metadata:
     eslint: ^8.36.0
     eslint-config-prettier: ^8.8.0
     eslint-plugin-prettier: ^5.0.0
+    marked: ^17.0.1
     mkdirp: ^1.0.3
     npm-run-all2: ^7.0.1
     prettier: ^3.0.0
@@ -5405,6 +5416,15 @@ __metadata:
   peerDependencies:
     marked: ">=4 <18"
   checksum: 3340af16fb4247142a6cb803e89a8e1650f2f4878da0d05344dd80780abd575288015e3f9ff831e075a0b09cc5947fce39fd68bcdce2fc8ed2f727a603d78ada
+  languageName: node
+  linkType: hard
+
+"marked@npm:*, marked@npm:^17.0.1":
+  version: 17.0.1
+  resolution: "marked@npm:17.0.1"
+  bin:
+    marked: bin/marked.js
+  checksum: c8387a3a1e0b4aa547b73f62eb946ee473861a62205f0a0e977276bda02738bf07de10bcc17fcf97a44fa017bce7b78d85290f0b478c1a8a4cc47054ac202f4e
   languageName: node
   linkType: hard
 

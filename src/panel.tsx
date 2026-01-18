@@ -6,6 +6,7 @@ import {
   settingsIcon
 } from '@jupyterlab/ui-components';
 import * as React from 'react';
+import { marked } from 'marked';
 
 import { ContextEngine } from './context';
 import {
@@ -448,9 +449,18 @@ function ChatView({
             <React.Fragment key={msgIndex}>
               {/* Message */}
               <div className={`jp-Mynerva-message jp-Mynerva-${msg.role}`}>
-                <div className="jp-Mynerva-message-content">
-                  {getDisplayContent(msg)}
-                </div>
+                {msg.role === 'assistant' ? (
+                  <div
+                    className="jp-Mynerva-message-content jp-Mynerva-markdown"
+                    dangerouslySetInnerHTML={{
+                      __html: marked.parse(getDisplayContent(msg)) as string
+                    }}
+                  />
+                ) : (
+                  <div className="jp-Mynerva-message-content">
+                    {getDisplayContent(msg)}
+                  </div>
+                )}
               </div>
               {/* Actions with bulk header */}
               {actions.length > 0 && (

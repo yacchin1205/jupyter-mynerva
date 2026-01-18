@@ -156,6 +156,77 @@
   font-size: var(--jp-ui-font-size1);
 }
 
+/* Markdown rendering */
+.jp-Mynerva-markdown {
+  white-space: normal;
+}
+
+.jp-Mynerva-markdown p {
+  margin: 0 0 0.5em;
+}
+
+.jp-Mynerva-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.jp-Mynerva-markdown code {
+  padding: 0.2em 0.4em;
+  background: var(--jp-layout-color3);
+  border-radius: 3px;
+  font-family: var(--jp-code-font-family);
+  font-size: 0.9em;
+}
+
+.jp-Mynerva-markdown pre {
+  margin: 0.5em 0;
+  padding: 0.75em;
+  background: var(--jp-layout-color3);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.jp-Mynerva-markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.jp-Mynerva-markdown ul,
+.jp-Mynerva-markdown ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.jp-Mynerva-markdown li {
+  margin: 0.25em 0;
+}
+
+.jp-Mynerva-markdown h1,
+.jp-Mynerva-markdown h2,
+.jp-Mynerva-markdown h3,
+.jp-Mynerva-markdown h4 {
+  margin: 0.5em 0 0.25em;
+  font-weight: 600;
+}
+
+.jp-Mynerva-markdown h1 {
+  font-size: 1.3em;
+}
+
+.jp-Mynerva-markdown h2 {
+  font-size: 1.2em;
+}
+
+.jp-Mynerva-markdown h3 {
+  font-size: 1.1em;
+}
+
+.jp-Mynerva-markdown blockquote {
+  margin: 0.5em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--jp-border-color1);
+  color: var(--jp-ui-font-color2);
+}
+
 .jp-Mynerva-input-area {
   display: flex;
   flex-direction: column;
