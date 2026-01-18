@@ -23,6 +23,16 @@ jupyter-mynerva keeps the story intact. Section structure, explanatory markdown,
 
 The LLM actively explores—requesting the table of contents, navigating sections, examining outputs. It pulls the context it needs, rather than waiting for users to push fragments.
 
+## Demo
+
+### Exploring a Notebook
+
+![Exploring Demo](images/demo-explore.gif)
+
+### Adding Code
+
+![Code Generation Demo](images/demo-codegen.gif)
+
 ## Architecture
 
 ```
