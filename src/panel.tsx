@@ -1329,7 +1329,12 @@ function MynervaComponent({
         ];
 
         const nextResponse = await sendChat(chatMessages, signal);
-        return processLLMResponse(nextResponse, newMessages, retryCount + 1, signal);
+        return processLLMResponse(
+          nextResponse,
+          newMessages,
+          retryCount + 1,
+          signal
+        );
       }
       // Max retries reached - show raw content
       return [...currentMessages, { role: 'assistant', content: rawContent }];
@@ -1367,7 +1372,12 @@ function MynervaComponent({
       ];
 
       const nextResponse = await sendChat(chatMessages, signal);
-      return processLLMResponse(nextResponse, newMessages, retryCount + 1, signal);
+      return processLLMResponse(
+        nextResponse,
+        newMessages,
+        retryCount + 1,
+        signal
+      );
     }
 
     // Validation passed - include actions
