@@ -15,7 +15,12 @@ export type IQueryAction =
   | IGetTocAction
   | IGetSectionAction
   | IGetCellsAction
-  | IGetOutputAction;
+  | IGetOutputAction
+  | IListNotebookFilesAction
+  | IGetTocFromFileAction
+  | IGetSectionFromFileAction
+  | IGetCellsFromFileAction
+  | IGetOutputFromFileAction;
 
 /**
  * Mutate action types (modify notebook, displayed on assistant side)
@@ -53,6 +58,35 @@ export interface IGetCellsAction {
 
 export interface IGetOutputAction {
   type: 'getOutput';
+  query: ICellQuery;
+}
+
+export interface IListNotebookFilesAction {
+  type: 'listNotebookFiles';
+  path?: string;
+}
+
+export interface IGetTocFromFileAction {
+  type: 'getTocFromFile';
+  path: string;
+}
+
+export interface IGetSectionFromFileAction {
+  type: 'getSectionFromFile';
+  path: string;
+  query: ICellQuery;
+}
+
+export interface IGetCellsFromFileAction {
+  type: 'getCellsFromFile';
+  path: string;
+  query: ICellQuery;
+  count?: number;
+}
+
+export interface IGetOutputFromFileAction {
+  type: 'getOutputFromFile';
+  path: string;
   query: ICellQuery;
 }
 

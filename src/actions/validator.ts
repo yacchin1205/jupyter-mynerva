@@ -22,6 +22,27 @@ const ACTION_SCHEMAS: Record<
     required: ['query'],
     optional: []
   },
+  // File query actions
+  listNotebookFiles: {
+    required: [],
+    optional: ['path']
+  },
+  getTocFromFile: {
+    required: ['path'],
+    optional: []
+  },
+  getSectionFromFile: {
+    required: ['path', 'query'],
+    optional: []
+  },
+  getCellsFromFile: {
+    required: ['path', 'query'],
+    optional: ['count']
+  },
+  getOutputFromFile: {
+    required: ['path', 'query'],
+    optional: []
+  },
   // Mutate actions
   insertCell: {
     required: ['position', 'cellType', 'source'],

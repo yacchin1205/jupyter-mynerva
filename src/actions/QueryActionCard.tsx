@@ -20,6 +20,16 @@ function getActionLabel(action: IQueryAction): string {
       return `Get Cells: ${JSON.stringify(action.query)}${action.count ? ` (count: ${action.count})` : ''}`;
     case 'getOutput':
       return `Get Output: ${JSON.stringify(action.query)}`;
+    case 'listNotebookFiles':
+      return `List Notebooks: ${action.path || '(root)'}`;
+    case 'getTocFromFile':
+      return `Get TOC from: ${action.path}`;
+    case 'getSectionFromFile':
+      return `Get Section from ${action.path}: ${JSON.stringify(action.query)}`;
+    case 'getCellsFromFile':
+      return `Get Cells from ${action.path}: ${JSON.stringify(action.query)}${action.count ? ` (count: ${action.count})` : ''}`;
+    case 'getOutputFromFile':
+      return `Get Output from ${action.path}: ${JSON.stringify(action.query)}`;
     default:
       return 'Unknown Action';
   }

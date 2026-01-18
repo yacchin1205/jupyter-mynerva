@@ -12,6 +12,7 @@ import {
   IAction,
   IQueryAction,
   IMutateAction,
+  IListNotebookFilesAction,
   ActionStatus,
   parseRawContent,
   validateActions,
@@ -21,6 +22,7 @@ import {
 } from './actions';
 import { buildSystemPrompt } from './systemPrompt';
 import { IFilter, applyFilters } from './filter';
+import { NotebookFileReader } from './notebookFile';
 
 const PANEL_CLASS = 'jp-Mynerva-panel';
 
@@ -275,7 +277,17 @@ function SettingsView({
   );
 }
 
-const QUERY_ACTION_TYPES = ['getToc', 'getSection', 'getCells', 'getOutput'];
+const QUERY_ACTION_TYPES = [
+  'getToc',
+  'getSection',
+  'getCells',
+  'getOutput',
+  'listNotebookFiles',
+  'getTocFromFile',
+  'getSectionFromFile',
+  'getCellsFromFile',
+  'getOutputFromFile'
+];
 const MUTATE_ACTION_TYPES = [
   'insertCell',
   'updateCell',
@@ -584,9 +596,13 @@ function MynervaComponent({
   const [initError, setInitError] = React.useState<string | null>(null);
   const [filters, setFilters] = React.useState<IFilter[]>([]);
   const [filterEnabled, setFilterEnabled] = React.useState(true);
-  // Auto-approval: Map<notebookPath, Set<actionType>>
+  // Auto-approval for active notebook: Map<notebookPath, Set<actionType>>
   const [autoApproved, setAutoApproved] = React.useState<
     Map<string, Set<ActionType>>
+  >(new Map());
+  // Auto-approval for file queries: Map<targetPath, Set<fileQueryActionType>>
+  const [fileAutoApproved, setFileAutoApproved] = React.useState<
+    Map<string, Set<string>>
   >(new Map());
 
   React.useEffect(() => {
@@ -624,16 +640,25 @@ function MynervaComponent({
   // Queue of action results waiting to be sent
   const [pendingResults, setPendingResults] = React.useState<string[]>([]);
 
-  const executeQueryAction = (action: IAction): string => {
+  // NotebookFileReader for file queries
+  const fileReaderRef = React.useRef<NotebookFileReader>(
+    new NotebookFileReader()
+  );
+
+  // Flag to prevent duplicate execution from useEffect during batch operations
+  const executingActionsRef = React.useRef(false);
+
+  const executeQueryAction = async (action: IAction): Promise<string> => {
     let result: string;
-    const path = contextEngine.getNotebookPath();
     switch (action.type) {
       case 'getToc': {
+        const path = contextEngine.getNotebookPath();
         const toc = contextEngine.getToc();
         result = JSON.stringify({ type: 'getToc', path, result: toc }, null, 2);
         break;
       }
       case 'getSection': {
+        const path = contextEngine.getNotebookPath();
         const cells = contextEngine.getSection(action.query);
         result = JSON.stringify(
           { type: 'getSection', path, result: cells },
@@ -643,6 +668,7 @@ function MynervaComponent({
         break;
       }
       case 'getCells': {
+        const path = contextEngine.getNotebookPath();
         const cells = contextEngine.queryCells(action.query, action.count);
         result = JSON.stringify(
           { type: 'getCells', path, result: cells },
@@ -652,6 +678,7 @@ function MynervaComponent({
         break;
       }
       case 'getOutput': {
+        const path = contextEngine.getNotebookPath();
         const outputs = contextEngine.getOutput(action.query);
         result = JSON.stringify(
           { type: 'getOutput', path, result: outputs },
@@ -671,6 +698,60 @@ function MynervaComponent({
       case 'help': {
         result = JSON.stringify(
           { type: 'help', result: `Help for action: ${action.action}` },
+          null,
+          2
+        );
+        break;
+      }
+      case 'listNotebookFiles': {
+        const fileReader = fileReaderRef.current;
+        const files = await fileReader.listNotebooks(action.path || '');
+        result = JSON.stringify(
+          { type: 'listNotebookFiles', path: action.path || '', result: files },
+          null,
+          2
+        );
+        break;
+      }
+      case 'getTocFromFile': {
+        const fileReader = fileReaderRef.current;
+        const toc = await fileReader.getToc(action.path);
+        result = JSON.stringify(
+          { type: 'getTocFromFile', path: action.path, result: toc },
+          null,
+          2
+        );
+        break;
+      }
+      case 'getSectionFromFile': {
+        const fileReader = fileReaderRef.current;
+        const cells = await fileReader.getSection(action.path, action.query);
+        result = JSON.stringify(
+          { type: 'getSectionFromFile', path: action.path, result: cells },
+          null,
+          2
+        );
+        break;
+      }
+      case 'getCellsFromFile': {
+        const fileReader = fileReaderRef.current;
+        const cells = await fileReader.getCells(
+          action.path,
+          action.query,
+          action.count
+        );
+        result = JSON.stringify(
+          { type: 'getCellsFromFile', path: action.path, result: cells },
+          null,
+          2
+        );
+        break;
+      }
+      case 'getOutputFromFile': {
+        const fileReader = fileReaderRef.current;
+        const outputs = await fileReader.getOutput(action.path, action.query);
+        result = JSON.stringify(
+          { type: 'getOutputFromFile', path: action.path, result: outputs },
           null,
           2
         );
@@ -749,7 +830,7 @@ function MynervaComponent({
     });
   };
 
-  const handleActionShare = (
+  const handleActionShare = async (
     msgIndex: number,
     actionIndex: number,
     action: IAction
@@ -758,7 +839,7 @@ function MynervaComponent({
 
     let result: string;
     try {
-      result = executeQueryAction(action);
+      result = await executeQueryAction(action);
     } catch (e) {
       console.error('Query action failed:', action.type, e);
       result = JSON.stringify(
@@ -806,18 +887,57 @@ function MynervaComponent({
     setActionStatus(msgIndex, actionIndex, 'cancelled');
   };
 
-  const addAutoApproval = (actionType: ActionType) => {
-    const path = contextEngine.getNotebookPath();
-    setAutoApproved(prev => {
-      const newMap = new Map(prev);
-      const types = newMap.get(path) ?? new Set<ActionType>();
-      types.add(actionType);
-      newMap.set(path, types);
-      return newMap;
-    });
+  const FILE_QUERY_TYPES = [
+    'listNotebookFiles',
+    'getTocFromFile',
+    'getSectionFromFile',
+    'getCellsFromFile',
+    'getOutputFromFile'
+  ];
+
+  const isFileQueryAction = (action: IAction): boolean => {
+    return FILE_QUERY_TYPES.includes(action.type);
+  };
+
+  const getFileQueryTargetPath = (action: IAction): string => {
+    if (action.type === 'listNotebookFiles') {
+      return (action as IListNotebookFilesAction).path || '';
+    }
+    return (action as { path: string }).path;
+  };
+
+  const addAutoApproval = (action: IAction) => {
+    if (isFileQueryAction(action)) {
+      const targetPath = getFileQueryTargetPath(action);
+      setFileAutoApproved(prev => {
+        const newMap = new Map(prev);
+        const types = newMap.get(targetPath) ?? new Set<string>();
+        types.add(action.type);
+        newMap.set(targetPath, types);
+        return newMap;
+      });
+    } else {
+      const path = contextEngine.getNotebookPath();
+      setAutoApproved(prev => {
+        const newMap = new Map(prev);
+        const types = newMap.get(path) ?? new Set<ActionType>();
+        types.add(action.type as ActionType);
+        newMap.set(path, types);
+        return newMap;
+      });
+    }
   };
 
   const isActionAutoApproved = (action: IAction): boolean => {
+    if (isFileQueryAction(action)) {
+      const targetPath = getFileQueryTargetPath(action);
+      const approved = fileAutoApproved.get(targetPath);
+      return approved?.has(action.type) ?? false;
+    }
+
+    if (!contextEngine.hasActiveNotebook()) {
+      return false;
+    }
     const path = contextEngine.getNotebookPath();
     const approved = autoApproved.get(path);
     if (!approved) {
@@ -829,13 +949,13 @@ function MynervaComponent({
     return approved.has(action.type as ActionType);
   };
 
-  const handleActionShareAlways = (
+  const handleActionShareAlways = async (
     msgIndex: number,
     actionIndex: number,
     action: IAction
   ) => {
-    addAutoApproval(action.type as ActionType);
-    handleActionShare(msgIndex, actionIndex, action);
+    await handleActionShare(msgIndex, actionIndex, action);
+    addAutoApproval(action);
   };
 
   const handleActionApplyAlways = async (
@@ -843,8 +963,8 @@ function MynervaComponent({
     actionIndex: number,
     action: IAction
   ) => {
-    addAutoApproval(action.type as ActionType);
     await handleActionApply(msgIndex, actionIndex, action);
+    addAutoApproval(action);
   };
 
   const handleAcceptAll = async (msgIndex: number) => {
@@ -857,7 +977,7 @@ function MynervaComponent({
       }
       const action = actions[i];
       if (isQueryAction(action)) {
-        handleActionShare(msgIndex, i, action);
+        await handleActionShare(msgIndex, i, action);
       } else if (isMutateAction(action)) {
         await handleActionApply(msgIndex, i, action);
       }
@@ -882,20 +1002,25 @@ function MynervaComponent({
   };
 
   const handleAcceptAllAlways = async (msgIndex: number) => {
-    const msg = messages[msgIndex];
-    const actions = msg.actions || [];
+    executingActionsRef.current = true;
+    try {
+      const msg = messages[msgIndex];
+      const actions = msg.actions || [];
 
-    for (let i = 0; i < actions.length; i++) {
-      if (getActionStatus(msgIndex, i) !== 'pending') {
-        continue;
+      for (let i = 0; i < actions.length; i++) {
+        if (getActionStatus(msgIndex, i) !== 'pending') {
+          continue;
+        }
+        const action = actions[i];
+        if (isQueryAction(action)) {
+          await handleActionShare(msgIndex, i, action);
+        } else if (isMutateAction(action)) {
+          await handleActionApply(msgIndex, i, action);
+        }
+        addAutoApproval(action);
       }
-      const action = actions[i];
-      addAutoApproval(action.type as ActionType);
-      if (isQueryAction(action)) {
-        handleActionShare(msgIndex, i, action);
-      } else if (isMutateAction(action)) {
-        await handleActionApply(msgIndex, i, action);
-      }
+    } finally {
+      executingActionsRef.current = false;
     }
   };
 
@@ -947,7 +1072,7 @@ function MynervaComponent({
 
   // Auto-execute approved actions when new messages arrive
   React.useEffect(() => {
-    if (loading) {
+    if (loading || executingActionsRef.current) {
       return;
     }
 
@@ -965,7 +1090,7 @@ function MynervaComponent({
           }
 
           if (isQueryAction(action)) {
-            handleActionShare(msgIndex, actionIndex, action);
+            await handleActionShare(msgIndex, actionIndex, action);
           } else if (isMutateAction(action)) {
             await handleActionApply(msgIndex, actionIndex, action);
           }
@@ -974,7 +1099,7 @@ function MynervaComponent({
     };
 
     executeAutoApproved();
-  }, [messages, autoApproved]);
+  }, [messages, autoApproved, fileAutoApproved]);
 
   const processLLMResponse = async (
     rawContent: string,

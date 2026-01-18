@@ -17,6 +17,13 @@ Query (active notebook) - results include "path" (notebook file path):
   - getCells: { "query": {...}, "count": N } - Get cell range from matched position
   - getOutput: { "query": {...} } - Get output of matched cell
 
+Query (other files) - results include "path":
+  - listNotebookFiles: { "path": "dir" } - List notebook files in directory (path optional, defaults to root)
+  - getTocFromFile: { "path": "file.ipynb" } - Get heading structure from file
+  - getSectionFromFile: { "path": "file.ipynb", "query": {...} } - Get cells under matched heading
+  - getCellsFromFile: { "path": "file.ipynb", "query": {...}, "count": N } - Get cell range
+  - getOutputFromFile: { "path": "file.ipynb", "query": {...} } - Get output of matched cell
+
 Mutate (active notebook):
   - insertCell: { "position": {...} or "end", "cellType": "code"|"markdown", "source": "..." } - Insert new cell
   - updateCell: { "query": {...}, "source": "..." } - Update cell content
@@ -28,8 +35,8 @@ Query syntax:
   { "contains": "text" } - substring match
   { "start": N } - cell index
   { "id": "cellId" } - cell ID
-  { "active": true } - currently focused cell
-  { "selected": true } - selected cells
+  { "active": true } - currently focused cell (active notebook only)
+  { "selected": true } - selected cells (active notebook only)
 
 Help:
   - listHelp: {} - show this prompt again
