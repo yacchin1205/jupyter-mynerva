@@ -56,7 +56,7 @@ The LLM actively explores—requesting the table of contents, navigating section
 | ------------------- | -------------------------------------------------------------------------------------------------- |
 | Context extraction  | TypeScript reimplementation of nbq                                                                 |
 | Privacy filter      | TypeScript, reads `.nbfilterrc.toml` for consistency with nbfilter                                 |
-| Session storage     | `.mynerva/*.mnchat` files, auto-named (timestamp + ID)                                             |
+| Session storage     | `.mynerva/sessions/*.mnchat` files, auto-named (timestamp + ID)                                    |
 | Session lifecycle   | Independent of active notebook; explicit switch only                                               |
 | Streaming           | Not supported                                                                                      |
 | File access         | Jupyter root directory only                                                                        |

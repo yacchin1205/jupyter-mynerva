@@ -152,6 +152,104 @@ async function sendChat(messages: IMessage[]): Promise<string> {
   return parseAssistantContent(data);
 }
 
+function humanizeTime(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) {
+    return 'just now';
+  }
+  if (diffMin < 60) {
+    return `${diffMin}m ago`;
+  }
+  if (diffHour < 24) {
+    return `${diffHour}h ago`;
+  }
+  if (diffDay < 7) {
+    return `${diffDay}d ago`;
+  }
+  return date.toLocaleDateString();
+}
+
+// Session API
+interface ISessionSummary {
+  id: string;
+  created: string;
+  updated: string;
+  messageCount: number;
+}
+
+interface ISession {
+  id: string;
+  created: string;
+  updated: string;
+  messages: IMessage[];
+}
+
+interface ISessionsResponse {
+  sessions: ISessionSummary[];
+  errors: Array<{ file: string; error: string }>;
+}
+
+async function getSessions(): Promise<ISessionsResponse> {
+  const settings = ServerConnection.makeSettings();
+  const url = `${settings.baseUrl}jupyter-mynerva/sessions`;
+  const response = await ServerConnection.makeRequest(url, {}, settings);
+  if (!response.ok) {
+    throw new Error(`Failed to get sessions (${response.status})`);
+  }
+  return response.json();
+}
+
+async function getSession(sessionId: string): Promise<ISession> {
+  const settings = ServerConnection.makeSettings();
+  const url = `${settings.baseUrl}jupyter-mynerva/sessions/${sessionId}`;
+  const response = await ServerConnection.makeRequest(url, {}, settings);
+  if (!response.ok) {
+    throw new Error(`Failed to get session (${response.status})`);
+  }
+  return response.json();
+}
+
+async function createSession(): Promise<string> {
+  const settings = ServerConnection.makeSettings();
+  const url = `${settings.baseUrl}jupyter-mynerva/sessions`;
+  const response = await ServerConnection.makeRequest(
+    url,
+    { method: 'POST' },
+    settings
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to create session (${response.status})`);
+  }
+  const data = await response.json();
+  return data.id;
+}
+
+async function saveSession(
+  sessionId: string,
+  messages: IMessage[]
+): Promise<void> {
+  const settings = ServerConnection.makeSettings();
+  const url = `${settings.baseUrl}jupyter-mynerva/sessions/${sessionId}`;
+  const response = await ServerConnection.makeRequest(
+    url,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ messages })
+    },
+    settings
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to save session (${response.status})`);
+  }
+}
+
 interface ISettingsViewProps {
   config: IConfig;
   providers: IProvider[];
@@ -614,10 +712,18 @@ function MynervaComponent({
   const [fileAutoApproved, setFileAutoApproved] = React.useState<
     Map<string, Set<string>>
   >(new Map());
+  // Session management
+  const [sessionId, setSessionId] = React.useState<string | null>(null);
+  const [sessions, setSessions] = React.useState<ISessionSummary[]>([]);
+  const [sessionLoadErrors, setSessionLoadErrors] = React.useState<
+    Array<{ file: string; error: string }>
+  >([]);
+  const [sessionError, setSessionError] = React.useState<string | null>(null);
+  const [showSessions, setShowSessions] = React.useState(false);
 
   React.useEffect(() => {
-    Promise.all([getProviders(), getConfig()])
-      .then(([providersRes, cfg]) => {
+    Promise.all([getProviders(), getConfig(), getSessions()])
+      .then(async ([providersRes, cfg, sessionsRes]) => {
         if (!providersRes.filters) {
           throw new Error('Server did not return privacy filter configuration');
         }
@@ -626,6 +732,11 @@ function MynervaComponent({
         setDefaults(providersRes.defaults);
         setFilters(providersRes.filters);
         setConfig(cfg);
+        setSessions(sessionsRes.sessions);
+        setSessionLoadErrors(sessionsRes.errors);
+
+        // Start with empty new session (don't auto-load past sessions)
+
         // Show settings if:
         // - no API key and not using defaults, OR
         // - useDefault is set but defaults are not available
@@ -657,6 +768,67 @@ function MynervaComponent({
 
   // Flag to prevent duplicate execution from useEffect during batch operations
   const executingActionsRef = React.useRef(false);
+
+  // Auto-save session when messages change
+  React.useEffect(() => {
+    if (sessionId && messages.length > 0) {
+      saveSession(sessionId, messages).catch(e => {
+        setSessionError(
+          `Failed to save session: ${e instanceof Error ? e.message : 'Unknown error'}`
+        );
+      });
+    }
+  }, [sessionId, messages]);
+
+  // Session switching
+  const handleSessionSwitch = async (newSessionId: string) => {
+    if (newSessionId === sessionId) {
+      return;
+    }
+    try {
+      setSessionError(null);
+      const session = await getSession(newSessionId);
+      setSessionId(session.id);
+      setMessages(session.messages);
+      // Mark all actions in loaded session as dismissed (already processed)
+      const statuses = new Map<number, Map<number, ActionStatus>>();
+      session.messages.forEach((msg, msgIndex) => {
+        const actions = msg.actions || [];
+        if (actions.length > 0) {
+          const actionMap = new Map<number, ActionStatus>();
+          actions.forEach((_, actionIndex) => {
+            actionMap.set(actionIndex, 'dismissed');
+          });
+          statuses.set(msgIndex, actionMap);
+        }
+      });
+      setActionStatuses(statuses);
+      setPendingResults([]);
+    } catch (e) {
+      setSessionError(
+        `Failed to load session: ${e instanceof Error ? e.message : 'Unknown error'}`
+      );
+    }
+  };
+
+  // Create new session
+  const handleNewSession = async () => {
+    try {
+      setSessionError(null);
+      const newId = await createSession();
+      setSessionId(newId);
+      setMessages([]);
+      setActionStatuses(new Map());
+      setPendingResults([]);
+      const sessionsRes = await getSessions();
+      setSessions(sessionsRes.sessions);
+      setSessionLoadErrors(sessionsRes.errors);
+    } catch (e) {
+      setSessionError(
+        `Failed to create session: ${e instanceof Error ? e.message : 'Unknown error'}`
+      );
+    }
+  };
 
   const executeQueryAction = async (action: IAction): Promise<string> => {
     let result: string;
@@ -1119,7 +1291,34 @@ function MynervaComponent({
     const MAX_RETRIES = 2;
     const parseResult = parseRawContent(rawContent);
 
+    // JSON parse error - retry with feedback
     if (parseResult.warning) {
+      if (retryCount < MAX_RETRIES) {
+        const assistantMessage: IMessage = {
+          role: 'assistant',
+          content: '(Format error - retrying...)'
+        };
+        const feedbackMessage: IMessage = {
+          role: 'user',
+          content: `[Format Error]\n\nYour response was not valid JSON. You must respond with JSON only, no text before or after.\n\nError: ${parseResult.warning.message}\n\nPlease retry with correct JSON format.`,
+          generated: true
+        };
+        const newMessages = [
+          ...currentMessages,
+          assistantMessage,
+          feedbackMessage
+        ];
+        setMessages(newMessages);
+
+        const chatMessages = [
+          { role: 'system' as const, content: buildSystemPrompt() },
+          ...newMessages
+        ];
+
+        const nextResponse = await sendChat(chatMessages);
+        return processLLMResponse(nextResponse, newMessages, retryCount + 1);
+      }
+      // Max retries reached - show raw content
       return [...currentMessages, { role: 'assistant', content: rawContent }];
     }
 
@@ -1131,6 +1330,7 @@ function MynervaComponent({
       .filter(Boolean)
       .join('\n\n');
 
+    // Action validation error - retry with feedback
     if (!validation.valid && retryCount < MAX_RETRIES) {
       const assistantMessage: IMessage = {
         role: 'assistant',
@@ -1172,6 +1372,21 @@ function MynervaComponent({
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setLoading(true);
+
+    // Create session on first message
+    if (!sessionId) {
+      try {
+        const newId = await createSession();
+        setSessionId(newId);
+        const sessionsRes = await getSessions();
+        setSessions(sessionsRes.sessions);
+        setSessionLoadErrors(sessionsRes.errors);
+      } catch (e) {
+        setSessionError(
+          `Failed to create session: ${e instanceof Error ? e.message : 'Unknown error'}`
+        );
+      }
+    }
 
     try {
       const chatMessages = [
@@ -1227,18 +1442,75 @@ function MynervaComponent({
     apiKey: ''
   };
 
+  const currentSession = sessions.find(s => s.id === sessionId);
+
   return (
     <div className={PANEL_CLASS}>
       <div className="jp-Mynerva-header">
         <span className="jp-Mynerva-title">Mynerva</span>
-        <button
-          className="jp-Mynerva-header-button"
-          onClick={() => setShowSettings(!showSettings)}
-          title="Settings"
-        >
-          <settingsIcon.react tag="span" />
-        </button>
+        <div className="jp-Mynerva-header-buttons">
+          <div className="jp-Mynerva-session-dropdown">
+            <button
+              className="jp-Mynerva-header-button"
+              onClick={() => setShowSessions(!showSessions)}
+              title="Sessions"
+            >
+              {currentSession
+                ? `Started ${humanizeTime(currentSession.created)}`
+                : 'Not started'}
+            </button>
+            {showSessions && (
+              <div className="jp-Mynerva-session-menu">
+                {sessions.map(s => (
+                  <button
+                    key={s.id}
+                    className={`jp-Mynerva-session-item ${s.id === sessionId ? 'jp-Mynerva-session-active' : ''}`}
+                    onClick={() => {
+                      handleSessionSwitch(s.id);
+                      setShowSessions(false);
+                    }}
+                  >
+                    <span className="jp-Mynerva-session-time">
+                      Started {humanizeTime(s.created)}
+                    </span>
+                    <span className="jp-Mynerva-session-count">
+                      {s.messageCount} msg
+                    </span>
+                  </button>
+                ))}
+                <button
+                  className="jp-Mynerva-session-item jp-Mynerva-session-new"
+                  onClick={() => {
+                    handleNewSession();
+                    setShowSessions(false);
+                  }}
+                >
+                  + New session
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            className="jp-Mynerva-header-button"
+            onClick={() => setShowSettings(!showSettings)}
+            title="Settings"
+          >
+            <settingsIcon.react tag="span" />
+          </button>
+        </div>
       </div>
+      {sessionError && (
+        <div className="jp-Mynerva-session-error">{sessionError}</div>
+      )}
+      {sessionLoadErrors.length > 0 && (
+        <div className="jp-Mynerva-session-errors">
+          {sessionLoadErrors.map((err, i) => (
+            <div key={i}>
+              Failed to load {err.file}: {err.error}
+            </div>
+          ))}
+        </div>
+      )}
       {showSettings ? (
         <SettingsView
           config={config || defaultConfig}

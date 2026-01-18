@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -344,6 +346,121 @@ class ChatHandler(APIHandler):
         self.finish(json.dumps(result))
 
 
+# Session management
+def get_sessions_dir():
+    return Path.home() / '.mynerva' / 'sessions'
+
+
+def generate_session_id():
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    short_id = uuid.uuid4().hex[:8]
+    return f'{timestamp}_{short_id}'
+
+
+def list_sessions():
+    sessions_dir = get_sessions_dir()
+    if not sessions_dir.exists():
+        return {'sessions': [], 'errors': []}
+
+    sessions = []
+    errors = []
+    for path in sessions_dir.glob('*.mnchat'):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            sessions.append({
+                'id': path.stem,
+                'created': data.get('created'),
+                'updated': data.get('updated'),
+                'messageCount': len(data.get('messages', []))
+            })
+        except (json.JSONDecodeError, IOError) as e:
+            errors.append({'file': path.name, 'error': str(e)})
+
+    sessions.sort(key=lambda s: s.get('updated') or s.get('created') or '', reverse=True)
+    return {'sessions': sessions, 'errors': errors}
+
+
+def get_session(session_id):
+    sessions_dir = get_sessions_dir()
+    path = sessions_dir / f'{session_id}.mnchat'
+    if not path.exists():
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+def save_session(session_id, data):
+    sessions_dir = get_sessions_dir()
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    path = sessions_dir / f'{session_id}.mnchat'
+
+    # Preserve existing created timestamp
+    if path.exists():
+        with open(path) as f:
+            existing = json.load(f)
+        data['created'] = existing.get('created', datetime.now().isoformat())
+    elif 'created' not in data:
+        data['created'] = datetime.now().isoformat()
+
+    data['updated'] = datetime.now().isoformat()
+
+    with open(path, 'w') as f:
+        json.dump(data, f)
+
+
+def delete_session(session_id):
+    sessions_dir = get_sessions_dir()
+    path = sessions_dir / f'{session_id}.mnchat'
+    if path.exists():
+        path.unlink()
+        return True
+    return False
+
+
+class SessionsHandler(APIHandler):
+    @tornado.web.authenticated
+    def get(self):
+        result = list_sessions()
+        self.finish(json.dumps(result))
+
+    @tornado.web.authenticated
+    def post(self):
+        session_id = generate_session_id()
+        data = {
+            'messages': [],
+            'created': datetime.now().isoformat(),
+            'updated': datetime.now().isoformat()
+        }
+        save_session(session_id, data)
+        self.finish(json.dumps({'id': session_id}))
+
+
+class SessionHandler(APIHandler):
+    @tornado.web.authenticated
+    def get(self, session_id):
+        data = get_session(session_id)
+        if data is None:
+            self.set_status(404)
+            self.finish(json.dumps({'error': 'Session not found'}))
+            return
+        self.finish(json.dumps({'id': session_id, **data}))
+
+    @tornado.web.authenticated
+    def put(self, session_id):
+        data = self.get_json_body()
+        save_session(session_id, data)
+        self.finish(json.dumps({'status': 'ok'}))
+
+    @tornado.web.authenticated
+    def delete(self, session_id):
+        if delete_session(session_id):
+            self.finish(json.dumps({'status': 'ok'}))
+        else:
+            self.set_status(404)
+            self.finish(json.dumps({'error': 'Session not found'}))
+
+
 def setup_route_handlers(web_app):
     host_pattern = '.*$'
     base_url = web_app.settings['base_url']
@@ -351,10 +468,14 @@ def setup_route_handlers(web_app):
     providers_pattern = url_path_join(base_url, 'jupyter-mynerva', 'providers')
     config_pattern = url_path_join(base_url, 'jupyter-mynerva', 'config')
     chat_pattern = url_path_join(base_url, 'jupyter-mynerva', 'chat')
+    sessions_pattern = url_path_join(base_url, 'jupyter-mynerva', 'sessions')
+    session_pattern = url_path_join(base_url, 'jupyter-mynerva', 'sessions', '([^/]+)')
     handlers = [
         (providers_pattern, ProvidersHandler),
         (config_pattern, ConfigHandler),
-        (chat_pattern, ChatHandler)
+        (chat_pattern, ChatHandler),
+        (sessions_pattern, SessionsHandler),
+        (session_pattern, SessionHandler)
     ]
 
     web_app.add_handlers(host_pattern, handlers)

@@ -533,3 +533,87 @@
 .jp-Mynerva-actions-bulk .jp-Mynerva-accept-all:hover {
   background: #1b5e20;
 }
+
+/* Header buttons */
+.jp-Mynerva-header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Session dropdown */
+.jp-Mynerva-session-dropdown {
+  position: relative;
+}
+
+.jp-Mynerva-session-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  min-width: 160px;
+  margin-top: 4px;
+  background: var(--jp-layout-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+
+.jp-Mynerva-session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--jp-ui-font-color1);
+  font-size: var(--jp-ui-font-size0);
+  text-align: left;
+  cursor: pointer;
+}
+
+.jp-Mynerva-session-item:hover {
+  background: var(--jp-layout-color2);
+}
+
+.jp-Mynerva-session-item.jp-Mynerva-session-active {
+  background: var(--jp-brand-color3);
+}
+
+.jp-Mynerva-session-time {
+  font-weight: 500;
+}
+
+.jp-Mynerva-session-count {
+  color: var(--jp-ui-font-color2);
+  font-size: var(--jp-ui-font-size0);
+}
+
+.jp-Mynerva-session-item.jp-Mynerva-session-new {
+  border-top: 1px solid var(--jp-border-color1);
+  color: var(--jp-brand-color1);
+  font-weight: 500;
+}
+
+.jp-Mynerva-session-error {
+  padding: 8px 12px;
+  background: var(--jp-error-color3);
+  color: var(--jp-error-color1);
+  font-size: var(--jp-ui-font-size0);
+}
+
+.jp-Mynerva-session-errors {
+  padding: 8px 12px;
+  background: var(--jp-warn-color3);
+  color: var(--jp-warn-color1);
+  font-size: var(--jp-ui-font-size0);
+}
+
+.jp-Mynerva-session-errors > div {
+  margin-bottom: 4px;
+}
+
+.jp-Mynerva-session-errors > div:last-child {
+  margin-bottom: 0;
+}
