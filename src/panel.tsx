@@ -129,7 +129,10 @@ function parseAssistantContent(data: IChatResponse): string {
   return JSON.stringify(response);
 }
 
-async function sendChat(messages: IMessage[]): Promise<string> {
+async function sendChat(
+  messages: IMessage[],
+  signal?: AbortSignal
+): Promise<string> {
   const settings = ServerConnection.makeSettings();
   const url = `${settings.baseUrl}jupyter-mynerva/chat`;
 
@@ -137,7 +140,8 @@ async function sendChat(messages: IMessage[]): Promise<string> {
     url,
     {
       method: 'POST',
-      body: JSON.stringify({ messages })
+      body: JSON.stringify({ messages }),
+      ...(signal && { signal })
     },
     settings
   );
@@ -464,6 +468,7 @@ interface IChatViewProps {
   onRejectAll: (msgIndex: number) => void;
   getActionStatus: (msgIndex: number, actionIndex: number) => ActionStatus;
   loading: boolean;
+  onCancelLoading: () => void;
   hasPendingActions: boolean;
   filterEnabled: boolean;
   onFilterToggle: (enabled: boolean) => void;
@@ -492,6 +497,7 @@ function ChatView({
   onRejectAll,
   getActionStatus,
   loading,
+  onCancelLoading,
   hasPendingActions,
   filterEnabled,
   onFilterToggle
@@ -673,13 +679,19 @@ function ChatView({
             />
             Privacy filter (.nbfilterrc.toml)
           </label>
-          <button
-            className="jp-Mynerva-send"
-            onClick={handleSend}
-            disabled={inputDisabled}
-          >
-            Send
-          </button>
+          {loading ? (
+            <button className="jp-Mynerva-cancel" onClick={onCancelLoading}>
+              Cancel
+            </button>
+          ) : (
+            <button
+              className="jp-Mynerva-send"
+              onClick={handleSend}
+              disabled={hasPendingActions}
+            >
+              Send
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -720,6 +732,9 @@ function MynervaComponent({
   >([]);
   const [sessionError, setSessionError] = React.useState<string | null>(null);
   const [showSessions, setShowSessions] = React.useState(false);
+
+  // AbortController for cancelling chat requests
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     Promise.all([getProviders(), getConfig(), getSessions()])
@@ -1286,7 +1301,8 @@ function MynervaComponent({
   const processLLMResponse = async (
     rawContent: string,
     currentMessages: IMessage[],
-    retryCount: number
+    retryCount: number,
+    signal?: AbortSignal
   ): Promise<IMessage[]> => {
     const MAX_RETRIES = 2;
     const parseResult = parseRawContent(rawContent);
@@ -1315,8 +1331,8 @@ function MynervaComponent({
           ...newMessages
         ];
 
-        const nextResponse = await sendChat(chatMessages);
-        return processLLMResponse(nextResponse, newMessages, retryCount + 1);
+        const nextResponse = await sendChat(chatMessages, signal);
+        return processLLMResponse(nextResponse, newMessages, retryCount + 1, signal);
       }
       // Max retries reached - show raw content
       return [...currentMessages, { role: 'assistant', content: rawContent }];
@@ -1353,8 +1369,8 @@ function MynervaComponent({
         ...newMessages
       ];
 
-      const nextResponse = await sendChat(chatMessages);
-      return processLLMResponse(nextResponse, newMessages, retryCount + 1);
+      const nextResponse = await sendChat(chatMessages, signal);
+      return processLLMResponse(nextResponse, newMessages, retryCount + 1, signal);
     }
 
     // Validation passed - include actions
@@ -1367,11 +1383,22 @@ function MynervaComponent({
     return [...currentMessages, assistantMessage];
   };
 
+  const handleCancelLoading = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    // Remove the last user message
+    setMessages(prev => prev.slice(0, -1));
+    setLoading(false);
+  };
+
   const handleSendMessage = async (content: string) => {
     const userMessage: IMessage = { role: 'user', content };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setLoading(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     // Create session on first message
     if (!sessionId) {
@@ -1393,16 +1420,25 @@ function MynervaComponent({
         { role: 'system' as const, content: buildSystemPrompt() },
         ...newMessages
       ];
-      const response = await sendChat(chatMessages);
-      const finalMessages = await processLLMResponse(response, newMessages, 0);
+      const response = await sendChat(chatMessages, controller.signal);
+      const finalMessages = await processLLMResponse(
+        response,
+        newMessages,
+        0,
+        controller.signal
+      );
       setMessages(finalMessages);
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        return; // Already handled by handleCancelLoading
+      }
       const errorMessage: IMessage = {
         role: 'assistant',
         content: `Error: ${e instanceof Error ? e.message : 'Unknown error'}`
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
     }
   };
@@ -1535,6 +1571,7 @@ function MynervaComponent({
           onRejectAll={handleRejectAll}
           getActionStatus={getActionStatus}
           loading={loading}
+          onCancelLoading={handleCancelLoading}
           hasPendingActions={hasPendingActions}
           filterEnabled={filterEnabled}
           onFilterToggle={setFilterEnabled}

@@ -289,6 +289,20 @@
   background: var(--jp-brand-color0);
 }
 
+.jp-Mynerva-cancel {
+  padding: 4px 16px;
+  border: none;
+  border-radius: 4px;
+  background: var(--jp-warn-color1);
+  color: white;
+  cursor: pointer;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jp-Mynerva-cancel:hover {
+  background: var(--jp-warn-color0);
+}
+
 /* Action cards */
 .jp-Mynerva-actions-container {
   margin-bottom: 8px;
