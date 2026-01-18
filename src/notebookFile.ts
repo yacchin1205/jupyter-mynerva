@@ -17,6 +17,7 @@ interface INotebookOutput {
   data?: Record<string, unknown>;
   ename?: string;
   evalue?: string;
+  traceback?: string[];
 }
 
 interface INotebookContent {
@@ -87,7 +88,11 @@ function extractOutputs(cell: INotebookCell): IOutputData[] | undefined {
           : String(textPlain);
       }
     } else if (output.output_type === 'error') {
-      outputData.text = `${output.ename}: ${output.evalue}`;
+      const lines = [`${output.ename}: ${output.evalue}`];
+      if (output.traceback) {
+        lines.push(...output.traceback);
+      }
+      outputData.text = lines.join('\n');
     }
 
     outputs.push(outputData);

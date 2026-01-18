@@ -147,24 +147,35 @@ export class ContextEngine {
     const outputs: IOutputData[] = [];
     for (let i = 0; i < codeCell.outputs.length; i++) {
       const output = codeCell.outputs.get(i);
+      const json = output.toJSON() as Record<string, unknown>;
       const outputData: IOutputData = {
         outputType: output.type
       };
 
       if (output.type === 'stream') {
-        outputData.text = (output as any).text;
+        const text = json.text;
+        outputData.text = Array.isArray(text)
+          ? text.join('')
+          : (text as string);
       } else if (
         output.type === 'execute_result' ||
         output.type === 'display_data'
       ) {
-        outputData.data = (output as any).data;
-        const textPlain = (output as any).data?.['text/plain'];
+        const data = json.data as Record<string, unknown> | undefined;
+        outputData.data = data;
+        const textPlain = data?.['text/plain'];
         if (textPlain) {
-          outputData.text = textPlain;
+          outputData.text = Array.isArray(textPlain)
+            ? textPlain.join('')
+            : (textPlain as string);
         }
       } else if (output.type === 'error') {
-        const errorOutput = output as any;
-        outputData.text = `${errorOutput.ename}: ${errorOutput.evalue}`;
+        const traceback = json.traceback as string[] | undefined;
+        const lines = [`${json.ename}: ${json.evalue}`];
+        if (traceback) {
+          lines.push(...traceback);
+        }
+        outputData.text = lines.join('\n');
       }
 
       outputs.push(outputData);
