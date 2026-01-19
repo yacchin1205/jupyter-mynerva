@@ -136,7 +136,7 @@ Query actions show a preview before sending to LLM. Users can choose to apply pr
 | `insertCell`  | `position`, `cellType`, `content` | Insert above/below current cell |
 | `replaceCell` | `query`, `content`                | Replace cell content            |
 | `deleteCell`  | `query`                           | Delete cell                     |
-| `executeCell` | `query?`                          | Execute cell (default: current) |
+| `runCell`     | `query?`                          | Execute cell (default: current) |
 
 ### Help (no confirmation required)
 
@@ -203,7 +203,7 @@ Mutate (requires _hash from prior read):
   - insertCell: { position, cellType, content }
   - replaceCell: { query, content, _hash }
   - deleteCell: { query, _hash }
-  - executeCell: { query? }
+  - runCell: { query? }
 
 Query syntax: { match: "regex" } | { contains: "text" } | { start: N } | { id: "cellId" }
 

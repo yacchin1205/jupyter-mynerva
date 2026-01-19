@@ -5,9 +5,9 @@ import { DropdownButton } from './DropdownButton';
 interface IMutateActionCardProps {
   action: IMutateAction;
   status: ActionStatus;
-  onApply: () => void;
-  onApplyAlways: () => void;
-  onCancel: () => void;
+  onApprove: () => void;
+  onApproveAlways: () => void;
+  onReject: () => void;
 }
 
 function getActionLabel(action: IMutateAction): string {
@@ -38,16 +38,19 @@ function getPreviewContent(action: IMutateAction): string | null {
 export function MutateActionCard({
   action,
   status,
-  onApply,
-  onApplyAlways,
-  onCancel
+  onApprove,
+  onApproveAlways,
+  onReject
 }: IMutateActionCardProps): React.ReactElement {
   const [showPreview, setShowPreview] = React.useState(false);
   const label = getActionLabel(action);
   const previewContent = getPreviewContent(action);
+  const isCompleted = status === 'executed' || status === 'notified';
 
   return (
-    <div className="jp-Mynerva-action-card jp-Mynerva-mutate-action">
+    <div
+      className={`jp-Mynerva-action-card jp-Mynerva-mutate-action${isCompleted ? ' jp-Mynerva-action-completed' : ''}`}
+    >
       <div className="jp-Mynerva-action-header">
         <span className="jp-Mynerva-action-icon">✏️</span>
         <span className="jp-Mynerva-action-type">{action.type}</span>
@@ -69,27 +72,32 @@ export function MutateActionCard({
           <div className="jp-Mynerva-action-buttons">
             <DropdownButton
               options={[
-                { label: 'Apply', onClick: onApply },
-                { label: 'Apply & Always', onClick: onApplyAlways }
+                { label: 'Accept', onClick: onApprove },
+                { label: 'Accept & Always', onClick: onApproveAlways }
               ]}
             />
             <button
               className="jp-Mynerva-action-button jp-Mynerva-cancel-button"
-              onClick={onCancel}
+              onClick={onReject}
             >
-              Cancel
+              Reject
             </button>
           </div>
         </>
       )}
-      {status === 'applied' && (
+      {status === 'approved' && (
+        <div className="jp-Mynerva-action-badge jp-Mynerva-approved-badge">
+          Approved
+        </div>
+      )}
+      {status === 'executed' && (
         <div className="jp-Mynerva-action-badge jp-Mynerva-applied-badge">
           Applied
         </div>
       )}
-      {status === 'cancelled' && (
+      {(status === 'rejected' || status === 'notified') && (
         <div className="jp-Mynerva-action-badge jp-Mynerva-cancelled-badge">
-          Cancelled
+          Rejected
         </div>
       )}
     </div>

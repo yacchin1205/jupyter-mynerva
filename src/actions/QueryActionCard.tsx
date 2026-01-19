@@ -5,9 +5,9 @@ import { DropdownButton } from './DropdownButton';
 interface IQueryActionCardProps {
   action: IQueryAction;
   status: ActionStatus;
-  onShare: () => void;
-  onShareAlways: () => void;
-  onDismiss: () => void;
+  onApprove: () => void;
+  onApproveAlways: () => void;
+  onReject: () => void;
 }
 
 function getActionLabel(action: IQueryAction): string {
@@ -38,14 +38,18 @@ function getActionLabel(action: IQueryAction): string {
 export function QueryActionCard({
   action,
   status,
-  onShare,
-  onShareAlways,
-  onDismiss
+  onApprove,
+  onApproveAlways,
+  onReject
 }: IQueryActionCardProps): React.ReactElement {
   const label = getActionLabel(action);
 
+  const isCompleted = status === 'executed' || status === 'notified';
+
   return (
-    <div className="jp-Mynerva-action-card jp-Mynerva-query-action">
+    <div
+      className={`jp-Mynerva-action-card jp-Mynerva-query-action${isCompleted ? ' jp-Mynerva-action-completed' : ''}`}
+    >
       <div className="jp-Mynerva-action-header">
         <span className="jp-Mynerva-action-icon">📋</span>
         <span className="jp-Mynerva-action-type">{action.type}</span>
@@ -55,24 +59,29 @@ export function QueryActionCard({
         <div className="jp-Mynerva-action-buttons">
           <DropdownButton
             options={[
-              { label: 'Share', onClick: onShare },
-              { label: 'Share & Always', onClick: onShareAlways }
+              { label: 'Share', onClick: onApprove },
+              { label: 'Share & Always', onClick: onApproveAlways }
             ]}
           />
           <button
             className="jp-Mynerva-action-button jp-Mynerva-dismiss-button"
-            onClick={onDismiss}
+            onClick={onReject}
           >
             Dismiss
           </button>
         </div>
       )}
-      {status === 'shared' && (
+      {status === 'approved' && (
+        <div className="jp-Mynerva-action-badge jp-Mynerva-approved-badge">
+          Approved
+        </div>
+      )}
+      {status === 'executed' && (
         <div className="jp-Mynerva-action-badge jp-Mynerva-shared-badge">
           Shared
         </div>
       )}
-      {status === 'dismissed' && (
+      {(status === 'rejected' || status === 'notified') && (
         <div className="jp-Mynerva-action-badge jp-Mynerva-dismissed-badge">
           Dismissed
         </div>

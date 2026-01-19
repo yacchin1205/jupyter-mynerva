@@ -1,5 +1,11 @@
 import { ContentsManager, Contents } from '@jupyterlab/services';
-import { ICellQuery, ITocEntry, ICellData, IOutputData } from './context';
+import {
+  ICellQuery,
+  ITocEntry,
+  ICellData,
+  IOutputData,
+  computeCellHash
+} from './context';
 
 /**
  * Notebook JSON structure from Contents API
@@ -49,13 +55,16 @@ function parseHeading(source: string): { level: number; text: string } | null {
  * Convert notebook cell to ICellData
  */
 function cellToData(cell: INotebookCell, index: number): ICellData {
+  const type = cell.cell_type;
+  const source = normalizeSource(cell.source);
   return {
     index,
     id: cell.id || `cell-${index}`,
-    type: cell.cell_type,
-    source: normalizeSource(cell.source),
+    type,
+    source,
     isActive: false,
-    isSelected: false
+    isSelected: false,
+    _hash: computeCellHash(type, source)
   };
 }
 

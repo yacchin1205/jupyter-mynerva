@@ -113,11 +113,13 @@ export interface IUpdateCellAction {
   type: 'updateCell';
   query: ICellQuery;
   source: string;
+  _hash: string;
 }
 
 export interface IDeleteCellAction {
   type: 'deleteCell';
   query: ICellQuery;
+  _hash: string;
 }
 
 export interface IRunCellAction {
@@ -127,15 +129,15 @@ export interface IRunCellAction {
 
 /**
  * Action status for UI
- * Query: pending → shared | dismissed
- * Mutate: pending → applied | cancelled
+ * pending → approved → executed
+ *        ↘ rejected → notified
  */
 export type ActionStatus =
   | 'pending'
-  | 'shared'
-  | 'dismissed'
-  | 'applied'
-  | 'cancelled';
+  | 'approved'
+  | 'executed'
+  | 'rejected'
+  | 'notified';
 
 /**
  * Action with status for tracking

@@ -438,28 +438,13 @@ function isQueryAutoApproved(
 interface IChatViewProps {
   messages: IMessage[];
   onSendMessage: (content: string) => void;
-  onActionShare: (
+  onActionApprove: (msgIndex: number, actionIndex: number) => void;
+  onActionApproveAlways: (
     msgIndex: number,
     actionIndex: number,
     action: IAction
   ) => void;
-  onActionShareAlways: (
-    msgIndex: number,
-    actionIndex: number,
-    action: IAction
-  ) => void;
-  onActionDismiss: (msgIndex: number, actionIndex: number) => void;
-  onActionApply: (
-    msgIndex: number,
-    actionIndex: number,
-    action: IAction
-  ) => void;
-  onActionApplyAlways: (
-    msgIndex: number,
-    actionIndex: number,
-    action: IAction
-  ) => void;
-  onActionCancel: (msgIndex: number, actionIndex: number) => void;
+  onActionReject: (msgIndex: number, actionIndex: number) => void;
   onAcceptAll: (msgIndex: number) => void;
   onAcceptAllAlways: (msgIndex: number) => void;
   onRejectAll: (msgIndex: number) => void;
@@ -483,12 +468,9 @@ function getDisplayContent(msg: IMessage): string {
 function ChatView({
   messages,
   onSendMessage,
-  onActionShare,
-  onActionShareAlways,
-  onActionDismiss,
-  onActionApply,
-  onActionApplyAlways,
-  onActionCancel,
+  onActionApprove,
+  onActionApproveAlways,
+  onActionReject,
   onAcceptAll,
   onAcceptAllAlways,
   onRejectAll,
@@ -594,30 +576,34 @@ function ChatView({
                       </div>
                     </div>
                   )}
-                  {/* Mutate actions (left side - assistant side) */}
+                  {/* Mutate actions (right side) */}
                   {actions.some(isMutateAction) && (
-                    <div className="jp-Mynerva-actions jp-Mynerva-assistant">
+                    <div className="jp-Mynerva-actions jp-Mynerva-user">
                       {actions.map((action, actionIndex) =>
                         isMutateAction(action) ? (
                           <MutateActionCard
                             key={actionIndex}
                             action={action}
                             status={getActionStatus(msgIndex, actionIndex)}
-                            onApply={() =>
-                              onActionApply(msgIndex, actionIndex, action)
+                            onApprove={() =>
+                              onActionApprove(msgIndex, actionIndex)
                             }
-                            onApplyAlways={() =>
-                              onActionApplyAlways(msgIndex, actionIndex, action)
+                            onApproveAlways={() =>
+                              onActionApproveAlways(
+                                msgIndex,
+                                actionIndex,
+                                action
+                              )
                             }
-                            onCancel={() =>
-                              onActionCancel(msgIndex, actionIndex)
+                            onReject={() =>
+                              onActionReject(msgIndex, actionIndex)
                             }
                           />
                         ) : null
                       )}
                     </div>
                   )}
-                  {/* Query actions (right side - user side) */}
+                  {/* Query actions (right side) */}
                   {actions.some(isQueryAction) && (
                     <div className="jp-Mynerva-actions jp-Mynerva-user">
                       {actions.map((action, actionIndex) =>
@@ -626,14 +612,18 @@ function ChatView({
                             key={actionIndex}
                             action={action}
                             status={getActionStatus(msgIndex, actionIndex)}
-                            onShare={() =>
-                              onActionShare(msgIndex, actionIndex, action)
+                            onApprove={() =>
+                              onActionApprove(msgIndex, actionIndex)
                             }
-                            onShareAlways={() =>
-                              onActionShareAlways(msgIndex, actionIndex, action)
+                            onApproveAlways={() =>
+                              onActionApproveAlways(
+                                msgIndex,
+                                actionIndex,
+                                action
+                              )
                             }
-                            onDismiss={() =>
-                              onActionDismiss(msgIndex, actionIndex)
+                            onReject={() =>
+                              onActionReject(msgIndex, actionIndex)
                             }
                           />
                         ) : null
@@ -802,14 +792,14 @@ function MynervaComponent({
       const session = await getSession(newSessionId);
       setSessionId(session.id);
       setMessages(session.messages);
-      // Mark all actions in loaded session as dismissed (already processed)
+      // Mark all actions in loaded session as executed (already processed)
       const statuses = new Map<number, Map<number, ActionStatus>>();
       session.messages.forEach((msg, msgIndex) => {
         const actions = msg.actions || [];
         if (actions.length > 0) {
           const actionMap = new Map<number, ActionStatus>();
           actions.forEach((_, actionIndex) => {
-            actionMap.set(actionIndex, 'dismissed');
+            actionMap.set(actionIndex, 'executed');
           });
           statuses.set(msgIndex, actionMap);
         }
@@ -976,11 +966,15 @@ function MynervaComponent({
         return JSON.stringify({ type: 'insertCell', result }, null, 2);
       }
       case 'updateCell': {
-        const result = contextEngine.updateCell(action.query, action.source);
+        const result = contextEngine.updateCell(
+          action.query,
+          action.source,
+          action._hash
+        );
         return JSON.stringify({ type: 'updateCell', result }, null, 2);
       }
       case 'deleteCell': {
-        const result = contextEngine.deleteCell(action.query);
+        const result = contextEngine.deleteCell(action.query, action._hash);
         return JSON.stringify({ type: 'deleteCell', result }, null, 2);
       }
       case 'runCell': {
@@ -1004,9 +998,10 @@ function MynervaComponent({
   };
 
   const hasPendingActions = messages.some((msg, msgIndex) =>
-    (msg.actions || []).some(
-      (_, actionIndex) => getActionStatus(msgIndex, actionIndex) === 'pending'
-    )
+    (msg.actions || []).some((_, actionIndex) => {
+      const status = getActionStatus(msgIndex, actionIndex);
+      return status === 'pending' || status === 'approved';
+    })
   );
 
   const setActionStatus = (
@@ -1024,18 +1019,28 @@ function MynervaComponent({
     });
   };
 
-  const handleActionShare = async (
+  const handleActionApprove = (msgIndex: number, actionIndex: number) => {
+    setActionStatus(msgIndex, actionIndex, 'approved');
+  };
+
+  const handleActionReject = (msgIndex: number, actionIndex: number) => {
+    setActionStatus(msgIndex, actionIndex, 'rejected');
+  };
+
+  const executeApprovedAction = async (
     msgIndex: number,
     actionIndex: number,
     action: IAction
   ) => {
-    setActionStatus(msgIndex, actionIndex, 'shared');
-
     let result: string;
     try {
-      result = await executeQueryAction(action);
+      if (isQueryAction(action)) {
+        result = await executeQueryAction(action);
+      } else {
+        result = await executeMutateAction(action);
+      }
     } catch (e) {
-      console.error('Query action failed:', action.type, e);
+      console.error('Action failed:', action.type, e);
       result = JSON.stringify(
         {
           type: action.type,
@@ -1047,38 +1052,7 @@ function MynervaComponent({
     }
 
     setPendingResults(prev => [...prev, result]);
-  };
-
-  const handleActionDismiss = (msgIndex: number, actionIndex: number) => {
-    setActionStatus(msgIndex, actionIndex, 'dismissed');
-  };
-
-  const handleActionApply = async (
-    msgIndex: number,
-    actionIndex: number,
-    action: IAction
-  ) => {
-    let result: string;
-    try {
-      result = await executeMutateAction(action);
-    } catch (e) {
-      console.error('Mutate action failed:', action.type, e);
-      result = JSON.stringify(
-        {
-          type: action.type,
-          error: e instanceof Error ? e.message : 'Unknown error'
-        },
-        null,
-        2
-      );
-    }
-
-    setPendingResults(prev => [...prev, result]);
-    setActionStatus(msgIndex, actionIndex, 'applied');
-  };
-
-  const handleActionCancel = (msgIndex: number, actionIndex: number) => {
-    setActionStatus(msgIndex, actionIndex, 'cancelled');
+    setActionStatus(msgIndex, actionIndex, 'executed');
   };
 
   const FILE_QUERY_TYPES = [
@@ -1143,25 +1117,16 @@ function MynervaComponent({
     return approved.has(action.type as ActionType);
   };
 
-  const handleActionShareAlways = async (
+  const handleActionApproveAlways = (
     msgIndex: number,
     actionIndex: number,
     action: IAction
   ) => {
-    await handleActionShare(msgIndex, actionIndex, action);
+    handleActionApprove(msgIndex, actionIndex);
     addAutoApproval(action);
   };
 
-  const handleActionApplyAlways = async (
-    msgIndex: number,
-    actionIndex: number,
-    action: IAction
-  ) => {
-    await handleActionApply(msgIndex, actionIndex, action);
-    addAutoApproval(action);
-  };
-
-  const handleAcceptAll = async (msgIndex: number) => {
+  const handleAcceptAll = (msgIndex: number) => {
     const msg = messages[msgIndex];
     const actions = msg.actions || [];
 
@@ -1169,12 +1134,7 @@ function MynervaComponent({
       if (getActionStatus(msgIndex, i) !== 'pending') {
         continue;
       }
-      const action = actions[i];
-      if (isQueryAction(action)) {
-        await handleActionShare(msgIndex, i, action);
-      } else if (isMutateAction(action)) {
-        await handleActionApply(msgIndex, i, action);
-      }
+      handleActionApprove(msgIndex, i);
     }
   };
 
@@ -1186,37 +1146,81 @@ function MynervaComponent({
       if (getActionStatus(msgIndex, i) !== 'pending') {
         continue;
       }
-      const action = actions[i];
-      if (isQueryAction(action)) {
-        handleActionDismiss(msgIndex, i);
-      } else if (isMutateAction(action)) {
-        handleActionCancel(msgIndex, i);
-      }
+      handleActionReject(msgIndex, i);
     }
   };
 
-  const handleAcceptAllAlways = async (msgIndex: number) => {
-    executingActionsRef.current = true;
-    try {
-      const msg = messages[msgIndex];
-      const actions = msg.actions || [];
+  const handleAcceptAllAlways = (msgIndex: number) => {
+    const msg = messages[msgIndex];
+    const actions = msg.actions || [];
 
-      for (let i = 0; i < actions.length; i++) {
-        if (getActionStatus(msgIndex, i) !== 'pending') {
-          continue;
-        }
-        const action = actions[i];
-        if (isQueryAction(action)) {
-          await handleActionShare(msgIndex, i, action);
-        } else if (isMutateAction(action)) {
-          await handleActionApply(msgIndex, i, action);
-        }
-        addAutoApproval(action);
+    for (let i = 0; i < actions.length; i++) {
+      if (getActionStatus(msgIndex, i) !== 'pending') {
+        continue;
       }
-    } finally {
-      executingActionsRef.current = false;
+      handleActionApprove(msgIndex, i);
+      addAutoApproval(actions[i]);
     }
   };
+
+  // Execute approved actions when all actions in a message are decided
+  React.useEffect(() => {
+    if (loading || executingActionsRef.current) {
+      return;
+    }
+
+    const executeBatch = async () => {
+      executingActionsRef.current = true;
+      try {
+        for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
+          const msg = messages[msgIndex];
+          const actions = msg.actions || [];
+          if (actions.length === 0) {
+            continue;
+          }
+
+          // Check if all actions are decided (not pending)
+          const allDecided = actions.every(
+            (_, i) => getActionStatus(msgIndex, i) !== 'pending'
+          );
+          if (!allDecided) {
+            continue;
+          }
+
+          // Check if any actions need processing
+          const hasApproved = actions.some(
+            (_, i) => getActionStatus(msgIndex, i) === 'approved'
+          );
+          const hasRejected = actions.some(
+            (_, i) => getActionStatus(msgIndex, i) === 'rejected'
+          );
+          if (!hasApproved && !hasRejected) {
+            continue;
+          }
+
+          // Process actions in order: execute approved, notify rejected
+          for (let i = 0; i < actions.length; i++) {
+            const status = getActionStatus(msgIndex, i);
+            if (status === 'approved') {
+              await executeApprovedAction(msgIndex, i, actions[i]);
+            } else if (status === 'rejected') {
+              const result = JSON.stringify(
+                { type: actions[i].type, rejected: true },
+                null,
+                2
+              );
+              setPendingResults(prev => [...prev, result]);
+              setActionStatus(msgIndex, i, 'notified');
+            }
+          }
+        }
+      } finally {
+        executingActionsRef.current = false;
+      }
+    };
+
+    executeBatch();
+  }, [messages, actionStatuses, loading]);
 
   // Send results when all actions are resolved
   React.useEffect(() => {
@@ -1264,35 +1268,43 @@ function MynervaComponent({
     sendResults();
   }, [hasPendingActions, pendingResults, loading]);
 
-  // Auto-execute approved actions when new messages arrive
+  // Auto-approve actions when all actions in a batch are auto-approvable
   React.useEffect(() => {
     if (loading || executingActionsRef.current) {
       return;
     }
 
-    const executeAutoApproved = async () => {
-      for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
-        const msg = messages[msgIndex];
-        const actions = msg.actions || [];
+    for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
+      const msg = messages[msgIndex];
+      const actions = msg.actions || [];
+      if (actions.length === 0) {
+        continue;
+      }
 
-        for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {
-          const action = actions[actionIndex];
-          const status = getActionStatus(msgIndex, actionIndex);
+      // Check if any pending actions exist
+      const hasPending = actions.some(
+        (_, i) => getActionStatus(msgIndex, i) === 'pending'
+      );
+      if (!hasPending) {
+        continue;
+      }
 
-          if (status !== 'pending' || !isActionAutoApproved(action)) {
-            continue;
-          }
+      // Check if ALL pending actions are auto-approvable
+      const allAutoApprovable = actions.every((action, i) => {
+        const status = getActionStatus(msgIndex, i);
+        return status !== 'pending' || isActionAutoApproved(action);
+      });
 
-          if (isQueryAction(action)) {
-            await handleActionShare(msgIndex, actionIndex, action);
-          } else if (isMutateAction(action)) {
-            await handleActionApply(msgIndex, actionIndex, action);
+      if (allAutoApprovable) {
+        // Approve all pending actions
+        for (let i = 0; i < actions.length; i++) {
+          if (getActionStatus(msgIndex, i) === 'pending') {
+            handleActionApprove(msgIndex, i);
           }
         }
       }
-    };
-
-    executeAutoApproved();
+      // If not all auto-approvable, do nothing (show buttons for all)
+    }
   }, [messages, autoApproved, fileAutoApproved]);
 
   const processLLMResponse = async (
@@ -1576,12 +1588,9 @@ function MynervaComponent({
         <ChatView
           messages={messages}
           onSendMessage={handleSendMessage}
-          onActionShare={handleActionShare}
-          onActionShareAlways={handleActionShareAlways}
-          onActionDismiss={handleActionDismiss}
-          onActionApply={handleActionApply}
-          onActionApplyAlways={handleActionApplyAlways}
-          onActionCancel={handleActionCancel}
+          onActionApprove={handleActionApprove}
+          onActionApproveAlways={handleActionApproveAlways}
+          onActionReject={handleActionReject}
           onAcceptAll={handleAcceptAll}
           onAcceptAllAlways={handleAcceptAllAlways}
           onRejectAll={handleRejectAll}

@@ -26,8 +26,8 @@ Query (other files) - results include "path":
 
 Mutate (active notebook):
   - insertCell: { "position": {...} or "end", "cellType": "code"|"markdown", "source": "..." } - Insert new cell
-  - updateCell: { "query": {...}, "source": "..." } - Update cell content
-  - deleteCell: { "query": {...} } - Delete cell
+  - updateCell: { "query": {...}, "source": "...", "_hash": "..." } - Update cell content (requires _hash from prior read)
+  - deleteCell: { "query": {...}, "_hash": "..." } - Delete cell (requires _hash from prior read)
   - runCell: { "query": {...} } - Execute cell
 
 Query syntax:

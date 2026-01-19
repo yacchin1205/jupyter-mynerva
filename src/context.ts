@@ -56,6 +56,7 @@ export interface ICellData {
   source: string;
   isActive: boolean;
   isSelected: boolean;
+  _hash: string;
 }
 
 /**
@@ -65,6 +66,18 @@ export interface IOutputData {
   outputType: string;
   text?: string;
   data?: Record<string, unknown>;
+}
+
+/**
+ * Compute hash for cell content (djb2 algorithm)
+ */
+export function computeCellHash(type: string, source: string): string {
+  const str = type + '\0' + source;
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 33) ^ str.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
 }
 
 /**
@@ -197,13 +210,15 @@ export class ContextEngine {
     if (type !== 'code' && type !== 'markdown' && type !== 'raw') {
       throw new Error(`Unknown cell type: ${type}`);
     }
+    const source = cell.sharedModel.source;
     return {
       index,
       id: cell.id,
       type,
-      source: cell.sharedModel.source,
+      source,
       isActive: index === activeCellIndex,
-      isSelected: selectedIndices.has(index)
+      isSelected: selectedIndices.has(index),
+      _hash: computeCellHash(type, source)
     };
   }
 
@@ -424,7 +439,12 @@ export class ContextEngine {
     position: ICellQuery | 'end',
     cellType: 'code' | 'markdown',
     source: string
-  ): { index: number; id: string } {
+  ): ICellData {
+    const panel = this.notebookTracker.currentWidget;
+    if (!panel) {
+      throw new Error('No notebook is open');
+    }
+    const notebook = panel.content;
     const model = this.getNotebookModel();
     const activeCellIndex = this.getActiveCellIndex();
     const selectedIndices = this.getSelectedCellIndices();
@@ -437,41 +457,79 @@ export class ContextEngine {
         this.findCellIndex(position, activeCellIndex, selectedIndices) + 1;
     }
 
-    const cellModel = model.sharedModel.insertCell(insertIndex, {
+    model.sharedModel.insertCell(insertIndex, {
       cell_type: cellType,
       source
     });
+    const cell = model.cells.get(insertIndex);
 
-    return { index: insertIndex, id: cellModel.id };
+    notebook.activeCellIndex = insertIndex;
+    notebook.scrollToItem(insertIndex);
+
+    return this.cellToData(cell, insertIndex, insertIndex, selectedIndices);
   }
 
   /**
    * Update cell source
    */
-  updateCell(query: ICellQuery, source: string): { index: number; id: string } {
+  updateCell(query: ICellQuery, source: string, _hash: string): ICellData {
+    const panel = this.notebookTracker.currentWidget;
+    if (!panel) {
+      throw new Error('No notebook is open');
+    }
+    const notebook = panel.content;
     const model = this.getNotebookModel();
     const activeCellIndex = this.getActiveCellIndex();
     const selectedIndices = this.getSelectedCellIndices();
     const index = this.findCellIndex(query, activeCellIndex, selectedIndices);
     const cell = model.cells.get(index);
 
+    const currentHash = computeCellHash(cell.type, cell.sharedModel.source);
+    if (currentHash !== _hash) {
+      throw new Error(
+        `Hash mismatch: cell has been modified (expected ${_hash}, got ${currentHash})`
+      );
+    }
+
     cell.sharedModel.source = source;
 
-    return { index, id: cell.id };
+    notebook.activeCellIndex = index;
+    notebook.scrollToItem(index);
+
+    return this.cellToData(cell, index, index, selectedIndices);
   }
 
   /**
    * Delete a cell
    */
-  deleteCell(query: ICellQuery): { index: number; id: string } {
+  deleteCell(query: ICellQuery, _hash: string): { index: number; id: string } {
+    const panel = this.notebookTracker.currentWidget;
+    if (!panel) {
+      throw new Error('No notebook is open');
+    }
+    const notebook = panel.content;
     const model = this.getNotebookModel();
     const activeCellIndex = this.getActiveCellIndex();
     const selectedIndices = this.getSelectedCellIndices();
     const index = this.findCellIndex(query, activeCellIndex, selectedIndices);
     const cell = model.cells.get(index);
-    const id = cell.id;
 
+    const currentHash = computeCellHash(cell.type, cell.sharedModel.source);
+    if (currentHash !== _hash) {
+      throw new Error(
+        `Hash mismatch: cell has been modified (expected ${_hash}, got ${currentHash})`
+      );
+    }
+
+    const id = cell.id;
     model.sharedModel.deleteCell(index);
+
+    const newCellCount = model.cells.length;
+    if (newCellCount > 0) {
+      const newIndex = Math.min(index, newCellCount - 1);
+      notebook.activeCellIndex = newIndex;
+      notebook.scrollToItem(newIndex);
+    }
 
     return { index, id };
   }

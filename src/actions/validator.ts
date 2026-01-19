@@ -49,11 +49,11 @@ const ACTION_SCHEMAS: Record<
     optional: []
   },
   updateCell: {
-    required: ['query', 'source'],
+    required: ['query', 'source', '_hash'],
     optional: []
   },
   deleteCell: {
-    required: ['query'],
+    required: ['query', '_hash'],
     optional: []
   },
   runCell: {
