@@ -30,6 +30,8 @@ jobs:
           branch: ${{ github.event.inputs.branch }}
           release_url: ${{ github.event.inputs.release_url }}
           steps_to_skip: ${{ github.event.inputs.steps_to_skip }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Finalize Release
         id: finalize-release
@@ -37,6 +39,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release_url: ${{ steps.populate-release.outputs.release_url }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: "** Next Step **"
         if: ${{ success() }}
